@@ -1,6 +1,7 @@
 package com.medicheck.server.controller;
 
 import com.medicheck.server.client.hira.HiraHospitalClient;
+import lombok.extern.slf4j.Slf4j;
 import com.medicheck.server.dto.HospitalResponse;
 import com.medicheck.server.dto.SyncResult;
 import com.medicheck.server.service.HiraSyncService;
@@ -24,6 +25,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/hospitals")
 @RequiredArgsConstructor
+@Slf4j
 public class HospitalController {
 
     private final HospitalService hospitalService;
@@ -56,10 +58,13 @@ public class HospitalController {
             SyncResult result = hiraSyncService.syncFromHira(pageNo, numOfRows);
             return ResponseEntity.ok(result);
         } catch (Exception e) {
+            // 민감한 예외 정보는 로그에만 남기고, 클라이언트에는 에러 ID만 노출
+            String errorId = java.util.UUID.randomUUID().toString();
+            log.error("HIRA 동기화 실패 errorId={}", errorId, e);
             return ResponseEntity.status(500).body(Map.of(
                     "error", "sync failed",
-                    "message", e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName(),
-                    "cause", e.getCause() != null ? String.valueOf(e.getCause().getMessage()) : ""
+                    "message", "internal server error",
+                    "errorId", errorId
             ));
         }
     }
