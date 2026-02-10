@@ -13,6 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * HIRA 병원정보 Open API 데이터를 DB에 동기화하는 서비스.
@@ -40,17 +42,30 @@ public class HiraSyncService {
                 && !hiraApiProperties.getServiceKey().isBlank();
 
         List<HiraHospItem> items = hiraHospitalClient.getHospBasisList(pageNo, numOfRows);
-        int saved = 0;
-        for (HiraHospItem item : items) {
-            if (item.getYkiho() == null || item.getYkiho().isBlank()) continue;
-            if (hospitalRepository.findByPublicCode(item.getYkiho()).isPresent()) continue;
-            String name = trim(item.getYadmNm(), 200);
-            if (name == null || name.isBlank()) continue;
+        List<String> ykihoList = items.stream()
+                .map(HiraHospItem::getYkiho)
+                .filter(y -> y != null && !y.isBlank())
+                .toList();
 
-            Hospital hospital = toHospital(item);
-            hospitalRepository.save(hospital);
-            saved++;
-        }
+        Set<String> existingCodes = ykihoList.isEmpty()
+                ? Set.of()
+                : hospitalRepository.findAllByPublicCodeIn(ykihoList).stream()
+                        .map(Hospital::getPublicCode)
+                        .collect(Collectors.toSet());
+
+        List<Hospital> toSave = items.stream()
+                .filter(item -> {
+                    String ykiho = item.getYkiho();
+                    if (ykiho == null || ykiho.isBlank()) return false;
+                    if (existingCodes.contains(trim(ykiho, 500))) return false;
+                    String name = trim(item.getYadmNm(), 200);
+                    return name != null && !name.isBlank();
+                })
+                .map(this::toHospital)
+                .toList();
+
+        hospitalRepository.saveAll(toSave);
+        int saved = toSave.size();
         log.info("HIRA 동기화: pageNo={}, numOfRows={}, 조회={}, 신규저장={}", pageNo, numOfRows, items.size(), saved);
         return SyncResult.builder()
                 .keyConfigured(keyConfigured)
