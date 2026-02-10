@@ -65,12 +65,10 @@ public class HiraHospitalClient {
         }
 
         try {
-            String keyForRequest = properties.isServiceKeyPreEncoded()
-                    ? properties.getServiceKey()
-                    : java.net.URLEncoder.encode(properties.getServiceKey(), StandardCharsets.UTF_8);
             UriComponentsBuilder builder = UriComponentsBuilder
                     .fromUriString(properties.getBaseUrl() + "/" + OPERATION)
-                    .queryParam("ServiceKey", keyForRequest)
+                    // ServiceKey 는 원본 값을 넘기고, build().encode() 로 일괄 인코딩
+                    .queryParam("ServiceKey", properties.getServiceKey())
                     .queryParam("pageNo", pageNo)
                     .queryParam("numOfRows", numOfRows)
                     .queryParam("_type", RESPONSE_TYPE_JSON);
@@ -83,7 +81,7 @@ public class HiraHospitalClient {
             if (yPos != null && !yPos.isBlank()) builder.queryParam("yPos", yPos);
             if (radius != null && radius > 0) builder.queryParam("radius", radius);
 
-            URI uri = builder.build().toUri();
+            URI uri = builder.build().encode().toUri();
             ResponseEntity<HiraApiResponse> response = restTemplate.getForEntity(uri, HiraApiResponse.class);
             HiraApiResponse body = response.getBody();
 
@@ -126,19 +124,16 @@ public class HiraHospitalClient {
             return new RawResponseResult(false, null, "인증키 미설정. local 프로필 또는 HIRA_SERVICE_KEY 확인.");
         }
         try {
-            String keyForRequest = properties.isServiceKeyPreEncoded()
-                    ? properties.getServiceKey()
-                    : java.net.URLEncoder.encode(properties.getServiceKey(), StandardCharsets.UTF_8);
             UriComponentsBuilder builder = UriComponentsBuilder
                     .fromUriString(properties.getBaseUrl() + "/" + OPERATION)
-                    .queryParam("ServiceKey", keyForRequest)
+                    .queryParam("ServiceKey", properties.getServiceKey())
                     .queryParam("pageNo", pageNo)
                     .queryParam("numOfRows", numOfRows)
                     .queryParam("_type", RESPONSE_TYPE_JSON);
             if (sidoCd != null && !sidoCd.isBlank()) {
                 builder.queryParam("sidoCd", sidoCd);
             }
-            URI uri = builder.build().toUri();
+            URI uri = builder.build().encode().toUri();
             String raw = restTemplate.getForObject(uri, String.class);
             return new RawResponseResult(true, raw != null ? raw : "(empty)", null);
         } catch (Exception e) {

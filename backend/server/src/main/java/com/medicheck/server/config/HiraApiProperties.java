@@ -17,9 +17,6 @@ public class HiraApiProperties {
     /** API 기본 URL (포털 개발계정: hospInfoServicev2) */
     private String baseUrl = "https://apis.data.go.kr/B551182/hospInfoServicev2";
 
-    /** 공공데이터포털에서 발급받은 서비스 인증키 (비인코딩 또는 인코딩 키) */
+    /** 공공데이터포털에서 발급받은 서비스 인증키 (항상 디코딩된 원본 값 사용) */
     private String serviceKey = "";
-
-    /** true면 인증키를 그대로 사용(인코딩 안 함). 포털에서 '일반인증키(인코딩)' 복사했을 때 true 로 설정 */
-    private boolean serviceKeyPreEncoded = false;
 }
