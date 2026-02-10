@@ -1,6 +1,5 @@
 package com.medicheck.server.controller;
 
-import com.medicheck.server.client.hira.HiraHospitalClient;
 import lombok.extern.slf4j.Slf4j;
 import com.medicheck.server.dto.HospitalResponse;
 import com.medicheck.server.dto.SyncResult;
@@ -30,7 +29,6 @@ public class HospitalController {
 
     private final HospitalService hospitalService;
     private final HiraSyncService hiraSyncService;
-    private final HiraHospitalClient hiraHospitalClient;
 
     /**
      * 병원 목록 조회 (페이지네이션).
@@ -69,19 +67,4 @@ public class HospitalController {
         }
     }
 
-    /**
-     * HIRA API 원문 응답 확인 (디버그용). GET /api/hospitals/sync/debug
-     */
-    @GetMapping("/sync/debug")
-    public ResponseEntity<Map<String, Object>> syncDebug(
-            @RequestParam(defaultValue = "1") int pageNo,
-            @RequestParam(defaultValue = "10") int numOfRows
-    ) {
-        HiraHospitalClient.RawResponseResult r = hiraHospitalClient.getRawResponse(pageNo, numOfRows);
-        return ResponseEntity.ok(Map.of(
-                "keyConfigured", r.keyConfigured(),
-                "rawResponse", r.rawResponse() != null ? r.rawResponse() : "",
-                "error", r.error() != null ? r.error() : ""
-        ));
-    }
 }
