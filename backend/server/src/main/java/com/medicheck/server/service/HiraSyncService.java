@@ -42,6 +42,105 @@ public class HiraSyncService {
                 && !hiraApiProperties.getServiceKey().isBlank();
 
         List<HiraHospItem> items = hiraHospitalClient.getHospBasisList(pageNo, numOfRows);
+        int saved = saveNewHospitals(items);
+
+        log.info("HIRA 동기화(서울 기본): pageNo={}, numOfRows={}, 조회={}, 신규저장={}",
+                pageNo, numOfRows, items.size(), saved);
+        return SyncResult.builder()
+                .keyConfigured(keyConfigured)
+                .fetchedCount(items.size())
+                .saved(saved)
+                .build();
+    }
+
+    /**
+     * 전국 시·도 코드를 순회하며 HIRA 병원정보를 모두 동기화합니다.
+     * 이미 존재하는 publicCode(ykiho)는 건너뜁니다.
+     *
+     * @param numOfRows 페이지당 조회 건수 (API 허용 범위 내에서 충분히 큰 값 권장)
+     */
+    @Transactional
+    public SyncResult syncAllRegions(int numOfRows) {
+        boolean keyConfigured = hiraApiProperties.getServiceKey() != null
+                && !hiraApiProperties.getServiceKey().isBlank();
+        if (!keyConfigured) {
+            return SyncResult.builder()
+                    .keyConfigured(false)
+                    .fetchedCount(0)
+                    .saved(0)
+                    .build();
+        }
+
+        // HIRA 시·도 코드 목록 (행정구역 코드 기준)
+        List<String> sidoCodes = List.of(
+                "110000", // 서울특별시
+                "260000", // 부산광역시
+                "270000", // 대구광역시
+                "280000", // 인천광역시
+                "290000", // 광주광역시
+                "300000", // 대전광역시
+                "310000", // 울산광역시
+                "360000", // 세종특별자치시
+                "410000", // 경기도
+                "420000", // 강원도
+                "430000", // 충청북도
+                "440000", // 충청남도
+                "450000", // 전라북도
+                "460000", // 전라남도
+                "470000", // 경상북도
+                "480000", // 경상남도
+                "490000"  // 제주특별자치도
+        );
+
+        int totalFetched = 0;
+        int totalSaved = 0;
+
+        for (String sidoCd : sidoCodes) {
+            int pageNo = 1;
+            while (true) {
+                List<HiraHospItem> items = hiraHospitalClient.getHospBasisList(
+                        pageNo,
+                        numOfRows,
+                        sidoCd,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null
+                );
+
+                if (items.isEmpty()) {
+                    log.info("HIRA 동기화 종료: sidoCd={}, pageNo={} (더 이상 item 없음)", sidoCd, pageNo);
+                    break;
+                }
+
+                int saved = saveNewHospitals(items);
+                totalFetched += items.size();
+                totalSaved += saved;
+
+                log.info("HIRA 동기화: sidoCd={}, pageNo={}, numOfRows={}, 조회={}, 신규저장={}",
+                        sidoCd, pageNo, numOfRows, items.size(), saved);
+
+                pageNo++;
+            }
+        }
+
+        return SyncResult.builder()
+                .keyConfigured(true)
+                .fetchedCount(totalFetched)
+                .saved(totalSaved)
+                .build();
+    }
+
+    /**
+     * HIRA 응답 item 리스트 중 아직 DB에 없는 병원만 골라 저장하고, 저장된 건수를 반환합니다.
+     */
+    private int saveNewHospitals(List<HiraHospItem> items) {
+        if (items == null || items.isEmpty()) {
+            return 0;
+        }
+
         List<String> ykihoList = items.stream()
                 .map(HiraHospItem::getYkiho)
                 .filter(y -> y != null && !y.isBlank())
@@ -65,13 +164,7 @@ public class HiraSyncService {
                 .toList();
 
         hospitalRepository.saveAll(toSave);
-        int saved = toSave.size();
-        log.info("HIRA 동기화: pageNo={}, numOfRows={}, 조회={}, 신규저장={}", pageNo, numOfRows, items.size(), saved);
-        return SyncResult.builder()
-                .keyConfigured(keyConfigured)
-                .fetchedCount(items.size())
-                .saved(saved)
-                .build();
+        return toSave.size();
     }
 
     private Hospital toHospital(HiraHospItem item) {

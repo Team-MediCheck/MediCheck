@@ -11,6 +11,10 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.stream.Collectors;
+
 /**
  * 안심 병원 조회 서비스.
  */
@@ -33,5 +37,31 @@ public class HospitalService {
         Specification<Hospital> spec =
                 HospitalSpecification.withFilters(keyword, department);
         return hospitalRepository.findAll(spec, pageable).map(HospitalResponse::from);
+    }
+
+    /**
+     * 사용자의 위치 기준 반경(radiusMeters m) 내 병원을 거리순으로 조회합니다.
+     *
+     * @param latitude     사용자 위도 (WGS84)
+     * @param longitude    사용자 경도 (WGS84)
+     * @param radiusMeters 반경 (미터)
+     */
+    public List<HospitalResponse> findNearby(BigDecimal latitude, BigDecimal longitude, double radiusMeters) {
+        if (latitude == null || longitude == null) {
+            throw new IllegalArgumentException("latitude and longitude must not be null");
+        }
+        if (radiusMeters <= 0) {
+            throw new IllegalArgumentException("radiusMeters must be greater than 0");
+        }
+
+        List<Hospital> hospitals = hospitalRepository.findNearby(
+                latitude.doubleValue(),
+                longitude.doubleValue(),
+                radiusMeters
+        );
+
+        return hospitals.stream()
+                .map(HospitalResponse::from)
+                .collect(Collectors.toList());
     }
 }
