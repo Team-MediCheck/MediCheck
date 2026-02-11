@@ -31,14 +31,16 @@ public class HospitalController {
     private final HiraSyncService hiraSyncService;
 
     /**
-     * 병원 목록 조회 (페이지네이션).
-     * GET /api/hospitals?page=0&size=20
+     * 병원 목록 조회 (검색/필터/정렬/페이지네이션).
+     * GET /api/hospitals?page=0&size=20&keyword=검색어&department=내과&sort=name,asc
      */
     @GetMapping
     public ResponseEntity<Page<HospitalResponse>> getHospitals(
-            @PageableDefault(size = 20) Pageable pageable
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String department,
+            @PageableDefault(size = 20, sort = "name") Pageable pageable
     ) {
-        Page<HospitalResponse> page = hospitalService.findAll(pageable);
+        Page<HospitalResponse> page = hospitalService.findAll(keyword, department, pageable);
         return ResponseEntity.ok(page);
     }
 
