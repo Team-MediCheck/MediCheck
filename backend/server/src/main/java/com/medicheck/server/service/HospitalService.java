@@ -24,7 +24,10 @@ import java.util.stream.Collectors;
 public class HospitalService {
 
     private final HospitalRepository hospitalRepository;
+    /** 근처 병원 조회 시 한 번에 반환할 최대 개수 */
     private static final int NEARBY_MAX_RESULTS = 100;
+    /** 근처 병원 조회에서 허용할 최대 반경 (미터) — 예: 50km */
+    private static final double MAX_RADIUS_METERS = 50_000;
 
     /**
      * 등록된 병원 목록을 페이지 단위로 조회합니다.
@@ -55,10 +58,12 @@ public class HospitalService {
             throw new IllegalArgumentException("radiusMeters must be greater than 0");
         }
 
+        double effectiveRadius = Math.min(radiusMeters, MAX_RADIUS_METERS);
+
         List<Hospital> hospitals = hospitalRepository.findNearby(
                 latitude.doubleValue(),
                 longitude.doubleValue(),
-                radiusMeters,
+                effectiveRadius,
                 NEARBY_MAX_RESULTS
         );
 
