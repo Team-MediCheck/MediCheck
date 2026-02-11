@@ -22,6 +22,9 @@ public class HiraSyncService {
     private final HospitalPersistenceService hospitalPersistenceService;
     private final HiraApiProperties hiraApiProperties;
 
+    /** HIRA 페이징에 대한 안전장치: 시·도별 최대 페이지 수 상한 */
+    private static final int MAX_PAGE = 500;
+
     /**
      * HIRA API에서 병원기본목록을 조회해 DB에 저장합니다.
      * 동일 publicCode(ykiho)가 있으면 건너뜁니다.
@@ -90,6 +93,12 @@ public class HiraSyncService {
         for (String sidoCd : sidoCodes) {
             int pageNo = 1;
             while (true) {
+                if (pageNo > MAX_PAGE) {
+                    log.warn("HIRA 동기화 중단: sidoCd={} pageNo={} 가 MAX_PAGE={} 를 초과했습니다. 무한 루프 방지.",
+                            sidoCd, pageNo, MAX_PAGE);
+                    break;
+                }
+
                 List<HiraHospItem> items = hiraHospitalClient.getHospBasisList(
                         pageNo,
                         numOfRows,
