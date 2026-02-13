@@ -8,11 +8,11 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 /**
- * 병원 목록/상세 API 응답 DTO.
+ * 근처 병원 API 응답 DTO. 기본 병원 정보 + 사용자 위치 기준 거리(m).
  */
 @Getter
 @Builder
-public class HospitalResponse {
+public class NearbyHospitalResponse {
 
     private Long id;
     private String name;
@@ -22,6 +22,8 @@ public class HospitalResponse {
     private String phone;
     private String publicCode;
     private String department;
+    /** 사용자 위치에서의 거리 (미터) */
+    private Double distanceMeters;
     private Integer doctorTotalCount;
     private LocalDate establishedDate;
     private Integer mdeptSpecialistCount;
@@ -31,8 +33,8 @@ public class HospitalResponse {
     private Integer detySpecialistCount;
     private Integer cmdcSpecialistCount;
 
-    public static HospitalResponse from(Hospital hospital) {
-        return HospitalResponse.builder()
+    public static NearbyHospitalResponse from(Hospital hospital, double distanceMeters) {
+        return NearbyHospitalResponse.builder()
                 .id(hospital.getId())
                 .name(hospital.getName())
                 .address(hospital.getAddress())
@@ -41,6 +43,7 @@ public class HospitalResponse {
                 .phone(hospital.getPhone())
                 .publicCode(hospital.getPublicCode())
                 .department(hospital.getDepartment())
+                .distanceMeters(distanceMeters)
                 .doctorTotalCount(hospital.getDoctorTotalCount())
                 .establishedDate(hospital.getEstablishedDate())
                 .mdeptSpecialistCount(hospital.getMdeptSpecialistCount())
