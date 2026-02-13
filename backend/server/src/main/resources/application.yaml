@@ -18,9 +18,10 @@ spring:
     console:
       enabled: false
 
-# 동기화 API 호출 시 필요한 관리자 키 (헤더 X-Admin-Key 와 일치해야 함)
+# 동기화 API 호출 시 필요한 관리자 키 (헤더 X-Admin-Key 와 일치해야 함).
+# 기본값 없음. 반드시 admin.sync-key 또는 환경변수 ADMIN_SYNC_KEY 로 설정해야 기동 가능.
 admin:
-  sync-key: ${ADMIN_SYNC_KEY:local-admin-key}
+  sync-key: ${ADMIN_SYNC_KEY:}
 
 # 건강보험심사평가원 병원정보 Open API (공공데이터포털 인증키)
 # 로컬: application-local.yaml 에 service-key 넣고 프로필 local 로 실행

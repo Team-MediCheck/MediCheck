@@ -150,7 +150,10 @@ public class HospitalController {
 
     private boolean isAdmin(String adminKey) {
         if (adminSyncKey == null || adminSyncKey.isBlank()) {
-            log.warn("관리자 동기화 키(admin.sync-key)가 설정되지 않았습니다. 모든 sync 요청을 거부합니다.");
+            log.error(
+                    "admin.sync-key(또는 ADMIN_SYNC_KEY)가 비어 있어 동기화 API 접근을 거부합니다. "
+                            + "프로덕션에서는 반드시 비어 있지 않은 값으로 설정해야 합니다."
+            );
             return false;
         }
         return adminKey != null && adminSyncKey.equals(adminKey);
