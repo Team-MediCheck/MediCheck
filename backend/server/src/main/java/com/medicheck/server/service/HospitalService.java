@@ -4,6 +4,7 @@ import com.medicheck.server.domain.entity.Hospital;
 import com.medicheck.server.domain.repository.HospitalRepository;
 import com.medicheck.server.domain.repository.HospitalSpecification;
 import com.medicheck.server.dto.HospitalResponse;
+import com.medicheck.server.dto.NearbyHospitalResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -13,6 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -44,13 +47,24 @@ public class HospitalService {
     }
 
     /**
+     * ID로 병원 한 건 조회합니다.
+     *
+     * @param id 병원 ID
+     * @return 병원이 있으면 HospitalResponse, 없으면 empty
+     */
+    public Optional<HospitalResponse> findById(Long id) {
+        return hospitalRepository.findById(id).map(HospitalResponse::from);
+    }
+
+    /**
      * 사용자의 위치 기준 반경(radiusMeters m) 내 병원을 거리순으로 조회합니다.
+     * 각 항목에 사용자 위치에서의 거리(distanceMeters)가 포함됩니다.
      *
      * @param latitude     사용자 위도 (WGS84)
      * @param longitude    사용자 경도 (WGS84)
      * @param radiusMeters 반경 (미터)
      */
-    public List<HospitalResponse> findNearby(BigDecimal latitude, BigDecimal longitude, double radiusMeters) {
+    public List<NearbyHospitalResponse> findNearby(BigDecimal latitude, BigDecimal longitude, double radiusMeters) {
         if (latitude == null || longitude == null) {
             throw new IllegalArgumentException("latitude and longitude must not be null");
         }
@@ -60,15 +74,33 @@ public class HospitalService {
 
         double effectiveRadius = Math.min(radiusMeters, MAX_RADIUS_METERS);
 
-        List<Hospital> hospitals = hospitalRepository.findNearby(
+        List<Object[]> idAndDistance = hospitalRepository.findNearbyIdAndDistance(
                 latitude.doubleValue(),
                 longitude.doubleValue(),
                 effectiveRadius,
                 NEARBY_MAX_RESULTS
         );
 
-        return hospitals.stream()
-                .map(HospitalResponse::from)
-                .collect(Collectors.toList());
+        if (idAndDistance.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> orderedIds = idAndDistance.stream()
+                .map(row -> ((Number) row[0]).longValue())
+                .toList();
+        Map<Long, Double> idToDistance = idAndDistance.stream()
+                .collect(Collectors.toMap(row -> ((Number) row[0]).longValue(), row -> ((Number) row[1]).doubleValue()));
+
+        List<Hospital> hospitals = hospitalRepository.findAllById(orderedIds);
+        Map<Long, Hospital> idToHospital = hospitals.stream().collect(Collectors.toMap(Hospital::getId, h -> h));
+
+        return orderedIds.stream()
+                .map(id -> {
+                    Hospital h = idToHospital.get(id);
+                    Double dist = idToDistance.get(id);
+                    return h != null && dist != null ? NearbyHospitalResponse.from(h, dist) : null;
+                })
+                .filter(r -> r != null)
+                .toList();
     }
 }

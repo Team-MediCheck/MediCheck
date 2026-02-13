@@ -2,6 +2,7 @@ package com.medicheck.server.controller;
 
 import lombok.extern.slf4j.Slf4j;
 import com.medicheck.server.dto.HospitalResponse;
+import com.medicheck.server.dto.NearbyHospitalResponse;
 import com.medicheck.server.dto.SyncResult;
 import com.medicheck.server.service.HiraSyncService;
 import com.medicheck.server.service.HospitalService;
@@ -13,6 +14,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -46,6 +48,17 @@ public class HospitalController {
      * 병원 목록 조회 (검색/필터/정렬/페이지네이션).
      * GET /api/hospitals?page=0&size=20&keyword=검색어&department=내과&sort=name,asc
      */
+    /**
+     * 병원 상세 조회.
+     * GET /api/hospitals/{id}
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<HospitalResponse> getHospital(@PathVariable Long id) {
+        return hospitalService.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
     @GetMapping
     public ResponseEntity<Page<HospitalResponse>> getHospitals(
             @RequestParam(required = false) String keyword,
@@ -59,16 +72,17 @@ public class HospitalController {
     /**
      * 근처 병원 조회.
      * 사용자의 위치(lat, lng)에서 반경(radiusMeters m) 내 병원을 거리 오름차순으로 반환합니다.
+     * 각 항목에 distanceMeters(미터)가 포함됩니다.
      *
      * 예: GET /api/hospitals/nearby?lat=37.5665&lng=126.9780&radiusMeters=3000
      */
     @GetMapping("/nearby")
-    public ResponseEntity<List<HospitalResponse>> getNearbyHospitals(
+    public ResponseEntity<List<NearbyHospitalResponse>> getNearbyHospitals(
             @RequestParam("lat") BigDecimal latitude,
             @RequestParam("lng") BigDecimal longitude,
             @RequestParam(name = "radiusMeters", defaultValue = "3000") double radiusMeters
     ) {
-        List<HospitalResponse> hospitals = hospitalService.findNearby(latitude, longitude, radiusMeters);
+        List<NearbyHospitalResponse> hospitals = hospitalService.findNearby(latitude, longitude, radiusMeters);
         return ResponseEntity.ok(hospitals);
     }
 
@@ -136,7 +150,10 @@ public class HospitalController {
 
     private boolean isAdmin(String adminKey) {
         if (adminSyncKey == null || adminSyncKey.isBlank()) {
-            log.warn("관리자 동기화 키(admin.sync-key)가 설정되지 않았습니다. 모든 sync 요청을 거부합니다.");
+            log.error(
+                    "admin.sync-key(또는 ADMIN_SYNC_KEY)가 비어 있어 동기화 API 접근을 거부합니다. "
+                            + "프로덕션에서는 반드시 비어 있지 않은 값으로 설정해야 합니다."
+            );
             return false;
         }
         return adminKey != null && adminSyncKey.equals(adminKey);

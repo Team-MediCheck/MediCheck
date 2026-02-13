@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 /**
  * 병원 목록/상세 API 응답 DTO.
@@ -21,6 +22,14 @@ public class HospitalResponse {
     private String phone;
     private String publicCode;
     private String department;
+    private Integer doctorTotalCount;
+    private LocalDate establishedDate;
+    private Integer mdeptSpecialistCount;
+    private Integer mdeptGeneralCount;
+    private Integer mdeptInternCount;
+    private Integer mdeptResidentCount;
+    private Integer detySpecialistCount;
+    private Integer cmdcSpecialistCount;
 
     public static HospitalResponse from(Hospital hospital) {
         return HospitalResponse.builder()
@@ -32,6 +41,14 @@ public class HospitalResponse {
                 .phone(hospital.getPhone())
                 .publicCode(hospital.getPublicCode())
                 .department(hospital.getDepartment())
+                .doctorTotalCount(hospital.getDoctorTotalCount())
+                .establishedDate(hospital.getEstablishedDate())
+                .mdeptSpecialistCount(hospital.getMdeptSpecialistCount())
+                .mdeptGeneralCount(hospital.getMdeptGeneralCount())
+                .mdeptInternCount(hospital.getMdeptInternCount())
+                .mdeptResidentCount(hospital.getMdeptResidentCount())
+                .detySpecialistCount(hospital.getDetySpecialistCount())
+                .cmdcSpecialistCount(hospital.getCmdcSpecialistCount())
                 .build();
     }
 }

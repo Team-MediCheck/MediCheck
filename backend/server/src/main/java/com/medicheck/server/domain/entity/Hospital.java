@@ -18,6 +18,7 @@ import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.PrecisionModel;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -74,6 +75,38 @@ public class Hospital {
     @Column(length = 100)
     private String department;
 
+    /** 의사총수 (HIRA drTotCnt) */
+    @Column(name = "doctor_total_count")
+    private Integer doctorTotalCount;
+
+    /** 개설일자 (HIRA estbDd, yyyyMMdd) */
+    @Column(name = "established_date")
+    private LocalDate establishedDate;
+
+    /** 의과전문의 인원수 */
+    @Column(name = "mdept_specialist_count")
+    private Integer mdeptSpecialistCount;
+
+    /** 의과일반의 인원수 */
+    @Column(name = "mdept_general_count")
+    private Integer mdeptGeneralCount;
+
+    /** 의과인턴 인원수 */
+    @Column(name = "mdept_intern_count")
+    private Integer mdeptInternCount;
+
+    /** 의과레지던트 인원수 */
+    @Column(name = "mdept_resident_count")
+    private Integer mdeptResidentCount;
+
+    /** 치과전문의 인원수 */
+    @Column(name = "dety_specialist_count")
+    private Integer detySpecialistCount;
+
+    /** 한방전문의 인원수 */
+    @Column(name = "cmdc_specialist_count")
+    private Integer cmdcSpecialistCount;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -88,7 +121,15 @@ public class Hospital {
             BigDecimal longitude,
             String phone,
             String publicCode,
-            String department
+            String department,
+            Integer doctorTotalCount,
+            LocalDate establishedDate,
+            Integer mdeptSpecialistCount,
+            Integer mdeptGeneralCount,
+            Integer mdeptInternCount,
+            Integer mdeptResidentCount,
+            Integer detySpecialistCount,
+            Integer cmdcSpecialistCount
     ) {
         this.name = name;
         this.hospName = name;
@@ -100,6 +141,14 @@ public class Hospital {
         this.publicCode = publicCode;
         this.ykiho = publicCode;
         this.department = department;
+        this.doctorTotalCount = doctorTotalCount;
+        this.establishedDate = establishedDate;
+        this.mdeptSpecialistCount = mdeptSpecialistCount;
+        this.mdeptGeneralCount = mdeptGeneralCount;
+        this.mdeptInternCount = mdeptInternCount;
+        this.mdeptResidentCount = mdeptResidentCount;
+        this.detySpecialistCount = detySpecialistCount;
+        this.cmdcSpecialistCount = cmdcSpecialistCount;
     }
 
     @PrePersist

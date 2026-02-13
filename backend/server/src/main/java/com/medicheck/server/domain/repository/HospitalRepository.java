@@ -49,5 +49,29 @@ public interface HospitalRepository extends JpaRepository<Hospital, Long>, JpaSp
             @Param("radiusMeters") double radiusMeters,
             @Param("maxResults") int maxResults
     );
+
+    /**
+     * 근처 병원 ID와 거리만 조회 (거리순). 응답 DTO에 distance를 넣기 위해 사용.
+     * 반환: 각 행 [id(Long), distance(Double)]
+     */
+    @Query(value = """
+            SELECT  h.id,
+                    ST_Distance_Sphere(
+                        h.location,
+                        ST_SRID(POINT(:longitude, :latitude), 4326)
+                    ) AS distance
+            FROM hospitals h
+            WHERE h.location IS NOT NULL
+            HAVING distance <= :radiusMeters
+            ORDER BY distance ASC
+            LIMIT :maxResults
+            """,
+            nativeQuery = true)
+    List<Object[]> findNearbyIdAndDistance(
+            @Param("latitude") double latitude,
+            @Param("longitude") double longitude,
+            @Param("radiusMeters") double radiusMeters,
+            @Param("maxResults") int maxResults
+    );
 }
 

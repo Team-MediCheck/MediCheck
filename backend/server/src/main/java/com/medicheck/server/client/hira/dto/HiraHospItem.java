@@ -55,6 +55,30 @@ public class HiraHospItem {
     @JsonProperty("hospUrl")
     private String hospUrl;
 
+    @JsonProperty("estbDd")
+    private String estbDd;
+
+    @JsonProperty("drTotCnt")
+    private Object drTotCnt;
+
+    @JsonProperty("mdeptSdrCnt")
+    private Object mdeptSdrCnt;
+
+    @JsonProperty("mdeptGdrCnt")
+    private Object mdeptGdrCnt;
+
+    @JsonProperty("mdeptIntnCnt")
+    private Object mdeptIntnCnt;
+
+    @JsonProperty("mdeptResdntCnt")
+    private Object mdeptResdntCnt;
+
+    @JsonProperty("detySdrCnt")
+    private Object detySdrCnt;
+
+    @JsonProperty("cmdcSdrCnt")
+    private Object cmdcSdrCnt;
+
     /** API가 숫자 또는 문자열로 내려줌 */
     @JsonProperty("XPos")
     private Object xPos;

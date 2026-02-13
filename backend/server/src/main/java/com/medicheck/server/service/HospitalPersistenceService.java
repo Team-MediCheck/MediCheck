@@ -8,6 +8,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -75,7 +78,38 @@ public class HospitalPersistenceService {
                 .phone(trim(item.getTelno(), 20))
                 .publicCode(trim(item.getYkiho(), 500))
                 .department(trim(item.getClCdNm(), 100))
+                .doctorTotalCount(parseInteger(item.getDrTotCnt()))
+                .establishedDate(parseEstbDd(item.getEstbDd()))
+                .mdeptSpecialistCount(parseInteger(item.getMdeptSdrCnt()))
+                .mdeptGeneralCount(parseInteger(item.getMdeptGdrCnt()))
+                .mdeptInternCount(parseInteger(item.getMdeptIntnCnt()))
+                .mdeptResidentCount(parseInteger(item.getMdeptResdntCnt()))
+                .detySpecialistCount(parseInteger(item.getDetySdrCnt()))
+                .cmdcSpecialistCount(parseInteger(item.getCmdcSdrCnt()))
                 .build();
+    }
+
+    private static Integer parseInteger(Object value) {
+        if (value == null) return null;
+        if (value instanceof Number n) return n.intValue();
+        String s = value.toString().trim();
+        if (s.isBlank()) return null;
+        try {
+            return Integer.parseInt(s);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private static final DateTimeFormatter ESTB_DD = DateTimeFormatter.ofPattern("yyyyMMdd");
+
+    private static LocalDate parseEstbDd(String estbDd) {
+        if (estbDd == null || estbDd.length() != 8) return null;
+        try {
+            return LocalDate.parse(estbDd.trim(), ESTB_DD);
+        } catch (DateTimeParseException e) {
+            return null;
+        }
     }
 
     /** API가 XPos/YPos를 숫자 또는 문자열로 줄 수 있어 안전하게 문자열로 변환 */
