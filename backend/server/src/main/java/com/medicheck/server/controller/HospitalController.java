@@ -7,16 +7,13 @@ import com.medicheck.server.dto.SyncResult;
 import com.medicheck.server.service.HiraSyncService;
 import com.medicheck.server.service.HospitalService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -36,13 +33,6 @@ public class HospitalController {
 
     private final HospitalService hospitalService;
     private final HiraSyncService hiraSyncService;
-
-    /**
-     * 관리용 동기화 엔드포인트 보호용 토큰.
-     * application[-local].yaml 의 admin.sync-key 또는 환경변수 ADMIN_SYNC_KEY 로 설정.
-     */
-    @Value("${admin.sync-key:${ADMIN_SYNC_KEY:}}")
-    private String adminSyncKey;
 
     /**
      * 병원 목록 조회 (검색/필터/정렬/페이지네이션).
@@ -93,16 +83,9 @@ public class HospitalController {
      */
     @PostMapping("/sync")
     public ResponseEntity<?> syncFromHira(
-            @RequestHeader(name = "X-Admin-Key", required = false) String adminKey,
             @RequestParam(defaultValue = "1") int pageNo,
             @RequestParam(defaultValue = "100") int numOfRows
     ) {
-        if (!isAdmin(adminKey)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
-                    "error", "forbidden",
-                    "message", "admin access required for sync"
-            ));
-        }
         try {
             SyncResult result = hiraSyncService.syncFromHira(pageNo, numOfRows);
             return ResponseEntity.ok(result);
@@ -125,15 +108,8 @@ public class HospitalController {
      */
     @PostMapping("/sync/all")
     public ResponseEntity<?> syncAllFromHira(
-            @RequestHeader(name = "X-Admin-Key", required = false) String adminKey,
             @RequestParam(defaultValue = "500") int numOfRows
     ) {
-        if (!isAdmin(adminKey)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
-                    "error", "forbidden",
-                    "message", "admin access required for sync-all"
-            ));
-        }
         try {
             SyncResult result = hiraSyncService.syncAllRegions(numOfRows);
             return ResponseEntity.ok(result);
@@ -147,16 +123,4 @@ public class HospitalController {
             ));
         }
     }
-
-    private boolean isAdmin(String adminKey) {
-        if (adminSyncKey == null || adminSyncKey.isBlank()) {
-            log.error(
-                    "admin.sync-key(또는 ADMIN_SYNC_KEY)가 비어 있어 동기화 API 접근을 거부합니다. "
-                            + "프로덕션에서는 반드시 비어 있지 않은 값으로 설정해야 합니다."
-            );
-            return false;
-        }
-        return adminKey != null && adminSyncKey.equals(adminKey);
-    }
-
 }

@@ -1,6 +1,8 @@
 package com.medicheck.server.controller;
 
 import com.medicheck.server.dto.HospitalResponse;
+import com.medicheck.server.security.SecurityConfig;
+import com.medicheck.server.security.XAdminKeyAuthFilter;
 import com.medicheck.server.dto.NearbyHospitalResponse;
 import com.medicheck.server.service.HospitalService;
 import com.medicheck.server.service.HiraSyncService;
@@ -9,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -27,6 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(HospitalController.class)
+@Import({SecurityConfig.class, XAdminKeyAuthFilter.class})
 @TestPropertySource(properties = "admin.sync-key=test-admin-key")
 class HospitalControllerApiTest {
 
