@@ -31,11 +31,14 @@
     var ix = rest.lastIndexOf('__');
     if (ix < 0) return;
     var enc = rest.slice(0, ix);
-    var expBase = decodeURIComponent(enc);
-    if (!expBase || expBase.indexOf('exp://') !== 0) return;
-    var join = expBase.indexOf('?') >= 0 ? '&' : '?';
+    var appReturnUrl = decodeURIComponent(enc);
+    if (!appReturnUrl) return;
+    var isExp = appReturnUrl.indexOf('exp://') === 0;
+    var isAppScheme = appReturnUrl.indexOf('medicheck://') === 0;
+    if (!isExp && !isAppScheme) return;
+    var join = appReturnUrl.indexOf('?') >= 0 ? '&' : '?';
     window.location.replace(
-      expBase + join + 'code=' + encodeURIComponent(code) + '&state=' + encodeURIComponent(state)
+      appReturnUrl + join + 'code=' + encodeURIComponent(code) + '&state=' + encodeURIComponent(state)
     );
   } catch (e) {
     if (msg) msg.textContent = '앱으로 돌아가지 못했습니다. 이 창을 닫은 뒤 앱에서 다시 시도해 주세요.';

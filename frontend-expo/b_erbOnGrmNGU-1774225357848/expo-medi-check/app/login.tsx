@@ -149,6 +149,10 @@ function getKakaoOAuthRedirectUri(): string {
   if (Platform.OS === 'web') {
     return AuthSession.makeRedirectUri({ path: 'oauth/kakao/callback' })
   }
+  const envRedirect = getKakaoOAuthRedirectFromEnvOverride()
+  if (envRedirect) {
+    return envRedirect
+  }
   /**
    * Expo Go(StoreClient)는 exp:// redirect 만 나와 카카오에 등록하기 어렵다 → https 콜백 유지.
    * Standalone / Dev Client(Bare)는 앱 스킴으로 돌려 iOS ASWebAuthenticationSession 이 https SPA 로드 후에도
@@ -164,10 +168,6 @@ function getKakaoOAuthRedirectUri(): string {
       scheme: 'medicheck',
       path: 'oauth/kakao/callback',
     })
-  }
-  const envRedirect = getKakaoOAuthRedirectFromEnvOverride()
-  if (envRedirect) {
-    return envRedirect
   }
   const publicOrigin = resolvePublicHttpsOriginFromApiBase()
   if (publicOrigin) {
@@ -254,15 +254,14 @@ export default function LoginScreen() {
         )
       }
 
-      /** Expo Go + 운영 HTTPS: Android 에뮬 등에서 openAuthSessionAsync 가 콜백을 못 넘기는 경우가 있어, iOS와 같이 브라우저+Linking+정적 HTML(exp://) 브리지 사용 */
-      const useExpoGoHttpsBrowserBridge =
-        exec === ExecutionEnvironment.StoreClient &&
+      /** 운영 HTTPS 콜백에서는 브라우저+Linking+정적 HTML 브리지를 사용해 Expo Go/Standalone 모두 콜백 전달을 안정화한다. */
+      const useHttpsBrowserBridge =
         redirectUri.startsWith('https://') &&
         !redirectUri.includes('auth.expo.io')
 
       /** `getDefaultReturnUrl()` 은 `/--/expo-auth-session` 이라 expo-router 에 매칭 라우트가 없어 Unmatched Route 가 난다 */
       const expoReturnUrl = Linking.createURL('/login')
-      const oauthState = useExpoGoHttpsBrowserBridge
+      const oauthState = useHttpsBrowserBridge
         ? `${KAKAO_OAUTH_EXPO_STATE_PREFIX}__${encodeURIComponent(expoReturnUrl)}__${await Crypto.randomUUID()}`
         : `${KAKAO_OAUTH_EXPO_STATE_PREFIX}.${await Crypto.randomUUID()}`
 
@@ -275,7 +274,7 @@ export default function LoginScreen() {
           state: oauthState,
         }).toString()
 
-      const result = useExpoGoHttpsBrowserBridge
+      const result = useHttpsBrowserBridge
         ? await openKakaoOAuthWithBrowserAndLinking(authUrl, expoReturnUrl)
         : await WebBrowser.openAuthSessionAsync(authUrl, redirectUri)
 
