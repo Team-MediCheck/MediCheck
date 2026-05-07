@@ -260,6 +260,15 @@ export async function loginWithKakao(
   })
 }
 
+export async function loginWithKakaoNativeAccessToken(
+  accessToken: string
+): Promise<AuthResponse> {
+  return fetchApi<AuthResponse>('/auth/login/kakao/native', {
+    method: 'POST',
+    body: JSON.stringify({ accessToken }),
+  })
+}
+
 /** 로그인 후 사용자 정보 조회. Bearer 토큰 필요 */
 export async function getMe(token: string): Promise<AuthUser | null> {
   try {

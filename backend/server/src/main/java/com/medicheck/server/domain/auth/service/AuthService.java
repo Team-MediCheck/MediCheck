@@ -72,6 +72,16 @@ public class AuthService {
     }
 
     /**
+     * 카카오 네이티브 SDK 액세스 토큰으로 로그인 처리.
+     */
+    public String loginWithKakaoAccessToken(String accessToken) {
+        KakaoOAuthService.KakaoUserInfo info = kakaoOAuthService.getUserInfoByAccessToken(accessToken);
+        String kakaoLoginId = "kakao_" + info.id();
+        String nickname = info.nickname() != null ? info.nickname().trim() : "";
+        return ensureKakaoUserAndGetToken(kakaoLoginId, nickname);
+    }
+
+    /**
      * 카카오 로그인용 사용자를 생성하거나 기존 사용자를 조회한 뒤 토큰을 발급합니다.
      * 동시 요청에 의한 중복 생성 시 DataIntegrityViolationException 을 잡고 재조회합니다.
      */
