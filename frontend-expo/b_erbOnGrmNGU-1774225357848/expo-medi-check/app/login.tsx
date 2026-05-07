@@ -31,6 +31,8 @@ function getKakaoRestApiKey(): string {
 }
 
 const KAKAO_OAUTH_CALLBACK_PATH = '/oauth/kakao/callback'
+const ANDROID_OAUTH_CANCEL_DELAY_MS = 1500
+const IOS_OAUTH_CANCEL_DELAY_MS = 300
 
 /**
  * Standalone / Dev Client 전용. 호스트 `app`으로 두어 `new URL(...)` 파싱 시 pathname 이 `/oauth/kakao/callback` 이 되게 함.
@@ -129,7 +131,8 @@ async function openKakaoOAuthWithBrowserAndLinking(
      * 곧바로 CANCEL 이 되어 카카오 화면도 못 보고 앱으로 돌아가는 현상이 난다.
      * CANCEL 은 짧게 미루어 딥링크를 먼저 처리하게 한다.
      */
-    const cancelDelayMs = Platform.OS === 'android' ? 300 : 100
+    // 일부 Android 기기/네트워크에서는 딥링크 이벤트가 늦게 도착해 cancel 오탐이 나므로 여유를 둔다.
+    const cancelDelayMs = Platform.OS === 'android' ? ANDROID_OAUTH_CANCEL_DELAY_MS : IOS_OAUTH_CANCEL_DELAY_MS
 
     void WebBrowser.openBrowserAsync(kakaoAuthorizeUrl)
       .then(() => {
@@ -254,7 +257,11 @@ export default function LoginScreen() {
         )
       }
 
-      /** 운영 HTTPS 콜백에서는 브라우저+Linking+정적 HTML 브리지를 사용해 Expo Go/Standalone 모두 콜백 전달을 안정화한다. */
+      /**
+       * HTTPS redirect_uri 일 때 nginx 가 `state` 접두어에 따라 `expo-kakao-oauth.html` 로 rewrite 해
+       * `medicheck://`(또는 Expo Go 의 `exp://`)로 code 를 넘긴다. StoreClient 전용으로 두면 Standalone 은
+       * SPA 콜백만 뜨고 `openAuthSessionAsync` 가 URL 을 앱에 넘기지 못한 채 멈추는 경우가 많다(Android).
+       */
       const useHttpsBrowserBridge =
         redirectUri.startsWith('https://') &&
         !redirectUri.includes('auth.expo.io')
@@ -271,6 +278,10 @@ export default function LoginScreen() {
           client_id: kakaoRestApiKey,
           redirect_uri: redirectUri,
           response_type: 'code',
+          // 카카오 세션이 남아 있어도 계정 선택/재로그인을 유도한다.
+          prompt: 'login',
+          // 카카오톡 앱 간편로그인 단계를 건너뛰고 카카오계정 로그인 화면으로 바로 진입한다.
+          through_account: 'true',
           state: oauthState,
         }).toString()
 

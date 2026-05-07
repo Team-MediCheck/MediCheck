@@ -2,6 +2,7 @@ package com.medicheck.server.domain.auth.service;
 
 import com.medicheck.server.global.config.KakaoOAuthProperties;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -9,6 +10,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
@@ -20,6 +22,7 @@ import java.util.Map;
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class KakaoOAuthService {
 
     private static final String TOKEN_URL = "https://kauth.kakao.com/oauth/token";
@@ -45,10 +48,16 @@ public class KakaoOAuthService {
         }
 
         try {
+            log.info("Kakao token exchange start: redirectUri={}, codeLength={}", redirectUri, code.length());
             String accessToken = fetchAccessToken(code, redirectUri);
             return fetchUserInfo(accessToken);
+        } catch (HttpStatusCodeException e) {
+            String responseBody = e.getResponseBodyAsString();
+            log.warn("Kakao API error: status={}, body={}", e.getStatusCode(), responseBody);
+            throw new IllegalArgumentException("카카오 로그인 토큰 교환에 실패했습니다. redirect_uri/code 값을 확인해 주세요.");
         } catch (RestClientException e) {
-            throw new IllegalArgumentException("카카오 로그인 통신 중 오류가 발생했습니다.", e);
+            log.warn("Kakao API communication error", e);
+            throw new KakaoOAuthCommunicationException("카카오 로그인 통신 중 오류가 발생했습니다.", e);
         }
     }
 
@@ -70,6 +79,14 @@ public class KakaoOAuthService {
         HttpEntity<MultiValueMap<String, String>> entity = new HttpEntity<>(params, headers);
         @SuppressWarnings("unchecked")
         Map<String, Object> body = kakaoRestTemplate.postForObject(TOKEN_URL, entity, Map.class);
+        if (body != null && body.get("error") != null) {
+            String error = String.valueOf(body.get("error"));
+            Object descriptionObj = body.get("error_description");
+            String description = descriptionObj == null ? "" : String.valueOf(descriptionObj);
+            log.warn("Kakao token response error: error={}, description={}", error, description);
+            throw new IllegalArgumentException(
+                    "카카오 토큰 응답 오류: " + error + (description.isBlank() ? "" : " (" + description + ")"));
+        }
         if (body == null || body.get("access_token") == null) {
             throw new IllegalArgumentException("카카오 액세스 토큰을 가져오지 못했습니다.");
         }

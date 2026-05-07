@@ -3,3 +3,14 @@ app:
     # 테스트 환경용 시크릿 (실서비스에서는 사용 금지)
     secret: "test-secret-for-jwt-should-be-long-enough-123456"
 
+spring:
+  datasource:
+    url: jdbc:h2:mem:medicheck_test;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  flyway:
+    enabled: false
