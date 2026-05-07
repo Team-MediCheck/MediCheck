@@ -3,6 +3,7 @@ package com.medicheck.server.domain.auth.controller;
 import com.medicheck.server.global.config.KakaoOAuthProperties;
 import com.medicheck.server.domain.user.entity.User;
 import com.medicheck.server.domain.auth.service.AuthService;
+import com.medicheck.server.domain.auth.service.KakaoOAuthCommunicationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -108,6 +109,7 @@ public class AuthController {
 
     private String resolveAllowedRedirectUri(String redirectUri, List<String> allowedRedirectUris) {
         if (allowedRedirectUris == null || allowedRedirectUris.isEmpty()) {
+            log.error("Kakao OAuth allowed redirect URIs are empty. Check kakao.oauth.allowed-redirect-uris configuration.");
             return null;
         }
         URI requestedUri = parseAndNormalizeUri(redirectUri);
@@ -185,6 +187,10 @@ public class AuthController {
             log.error("Kakao login config error: redirectUri={}", resolvedRedirectUri, e);
             return ResponseEntity.status(503)
                     .body(Map.of("error", "kakao_config_error", "message", e.getMessage()));
+        } catch (KakaoOAuthCommunicationException e) {
+            log.error("Kakao login upstream communication error: redirectUri={}", resolvedRedirectUri, e);
+            return ResponseEntity.status(502)
+                    .body(Map.of("error", "kakao_upstream_error", "message", e.getMessage()));
         } catch (IllegalArgumentException e) {
             log.warn("Kakao login failed: redirectUri={}, reason={}", resolvedRedirectUri, e.getMessage());
             return ResponseEntity.status(401)

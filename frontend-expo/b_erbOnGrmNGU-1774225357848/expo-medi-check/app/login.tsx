@@ -31,6 +31,8 @@ function getKakaoRestApiKey(): string {
 }
 
 const KAKAO_OAUTH_CALLBACK_PATH = '/oauth/kakao/callback'
+const ANDROID_OAUTH_CANCEL_DELAY_MS = 1500
+const IOS_OAUTH_CANCEL_DELAY_MS = 300
 
 /**
  * Standalone / Dev Client 전용. 호스트 `app`으로 두어 `new URL(...)` 파싱 시 pathname 이 `/oauth/kakao/callback` 이 되게 함.
@@ -130,7 +132,7 @@ async function openKakaoOAuthWithBrowserAndLinking(
      * CANCEL 은 짧게 미루어 딥링크를 먼저 처리하게 한다.
      */
     // 일부 Android 기기/네트워크에서는 딥링크 이벤트가 늦게 도착해 cancel 오탐이 나므로 여유를 둔다.
-    const cancelDelayMs = Platform.OS === 'android' ? 1500 : 300
+    const cancelDelayMs = Platform.OS === 'android' ? ANDROID_OAUTH_CANCEL_DELAY_MS : IOS_OAUTH_CANCEL_DELAY_MS
 
     void WebBrowser.openBrowserAsync(kakaoAuthorizeUrl)
       .then(() => {

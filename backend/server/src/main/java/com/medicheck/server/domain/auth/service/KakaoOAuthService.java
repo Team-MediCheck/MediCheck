@@ -57,7 +57,7 @@ public class KakaoOAuthService {
             throw new IllegalArgumentException("카카오 로그인 토큰 교환에 실패했습니다. redirect_uri/code 값을 확인해 주세요.");
         } catch (RestClientException e) {
             log.warn("Kakao API communication error", e);
-            throw new IllegalArgumentException("카카오 로그인 통신 중 오류가 발생했습니다.", e);
+            throw new KakaoOAuthCommunicationException("카카오 로그인 통신 중 오류가 발생했습니다.", e);
         }
     }
 
@@ -80,8 +80,12 @@ public class KakaoOAuthService {
         @SuppressWarnings("unchecked")
         Map<String, Object> body = kakaoRestTemplate.postForObject(TOKEN_URL, entity, Map.class);
         if (body != null && body.get("error") != null) {
-            log.warn("Kakao token response error: error={}, description={}",
-                    body.get("error"), body.get("error_description"));
+            String error = String.valueOf(body.get("error"));
+            Object descriptionObj = body.get("error_description");
+            String description = descriptionObj == null ? "" : String.valueOf(descriptionObj);
+            log.warn("Kakao token response error: error={}, description={}", error, description);
+            throw new IllegalArgumentException(
+                    "카카오 토큰 응답 오류: " + error + (description.isBlank() ? "" : " (" + description + ")"));
         }
         if (body == null || body.get("access_token") == null) {
             throw new IllegalArgumentException("카카오 액세스 토큰을 가져오지 못했습니다.");
