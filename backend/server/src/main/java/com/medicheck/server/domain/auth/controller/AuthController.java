@@ -198,6 +198,33 @@ public class AuthController {
         }
     }
 
+    @Operation(summary = "카카오 네이티브 로그인", description = "프론트 네이티브 SDK에서 받은 accessToken으로 사용자 정보를 조회해 JWT를 발급합니다.")
+    @PostMapping("/login/kakao/native")
+    public ResponseEntity<Map<String, Object>> kakaoNativeLogin(@RequestBody Map<String, String> body) {
+        String accessToken = body.get("accessToken");
+        if (accessToken == null || accessToken.isBlank()) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "invalid_input", "message", "카카오 액세스 토큰이 없습니다."));
+        }
+        try {
+            log.info("Kakao native login requested: accessTokenLength={}", accessToken.length());
+            String token = authService.loginWithKakaoAccessToken(accessToken);
+            return ResponseEntity.ok(Map.of("token", token));
+        } catch (IllegalStateException e) {
+            log.error("Kakao native login config error", e);
+            return ResponseEntity.status(503)
+                    .body(Map.of("error", "kakao_config_error", "message", e.getMessage()));
+        } catch (KakaoOAuthCommunicationException e) {
+            log.error("Kakao native login upstream communication error", e);
+            return ResponseEntity.status(502)
+                    .body(Map.of("error", "kakao_upstream_error", "message", e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            log.warn("Kakao native login failed: reason={}", e.getMessage());
+            return ResponseEntity.status(401)
+                    .body(Map.of("error", "kakao_login_failed", "message", e.getMessage()));
+        }
+    }
+
     @Operation(summary = "내 정보", description = "Authorization: Bearer JWT로 로그인한 사용자의 loginId, name, userId를 반환합니다.")
     @GetMapping("/me")
     public ResponseEntity<Map<String, Object>> me(Authentication auth) {

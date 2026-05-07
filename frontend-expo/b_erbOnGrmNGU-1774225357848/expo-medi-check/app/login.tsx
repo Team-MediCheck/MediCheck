@@ -19,7 +19,8 @@ import * as AuthSession from 'expo-auth-session'
 import * as Linking from 'expo-linking'
 import * as WebBrowser from 'expo-web-browser'
 import { useAuthStore } from '@/store/authStore'
-import { login, getMe, loginWithKakao } from '@/lib/api'
+import { login as kakaoNativeLogin } from '@react-native-seoul/kakao-login'
+import { login, getMe, loginWithKakao, loginWithKakaoNativeAccessToken } from '@/lib/api'
 
 type Extra = {
   kakaoRestApiKey?: string
@@ -33,6 +34,7 @@ function getKakaoRestApiKey(): string {
 const KAKAO_OAUTH_CALLBACK_PATH = '/oauth/kakao/callback'
 const ANDROID_OAUTH_CANCEL_DELAY_MS = 1500
 const IOS_OAUTH_CANCEL_DELAY_MS = 300
+const DEBUG_KAKAO_OAUTH = true
 
 /**
  * Standalone / Dev Client 전용. 호스트 `app`으로 두어 `new URL(...)` 파싱 시 pathname 이 `/oauth/kakao/callback` 이 되게 함.
@@ -102,6 +104,12 @@ async function openKakaoOAuthWithBrowserAndLinking(
   kakaoAuthorizeUrl: string,
   expoReturnUrl: string
 ): Promise<WebBrowser.WebBrowserAuthSessionResult> {
+  if (DEBUG_KAKAO_OAUTH) {
+    console.log('[KAKAO_OAUTH] openBrowserAsync start', {
+      kakaoAuthorizeUrl,
+      expoReturnUrl,
+    })
+  }
   const returnPrefix = expoReturnUrl.split('?')[0]
   return await new Promise((resolve) => {
     let settled = false
@@ -111,6 +119,11 @@ async function openKakaoOAuthWithBrowserAndLinking(
       if (settled) return
       settled = true
       sub.remove()
+      if (DEBUG_KAKAO_OAUTH) {
+        console.log('[KAKAO_OAUTH] openBrowserAsync cancel timeout', {
+          returnPrefix,
+        })
+      }
       resolve({ type: WebBrowser.WebBrowserResultType.CANCEL })
     }
 
@@ -119,6 +132,9 @@ async function openKakaoOAuthWithBrowserAndLinking(
       if (!url || (!url.includes('code=') && !url.includes('error='))) return
       if (!url.startsWith(returnPrefix)) return
       if (settled) return
+      if (DEBUG_KAKAO_OAUTH) {
+        console.log('[KAKAO_OAUTH] Linking url event received', { url })
+      }
       if (cancelTimer) clearTimeout(cancelTimer)
       settled = true
       sub.remove()
@@ -136,13 +152,77 @@ async function openKakaoOAuthWithBrowserAndLinking(
 
     void WebBrowser.openBrowserAsync(kakaoAuthorizeUrl)
       .then(() => {
+        if (DEBUG_KAKAO_OAUTH) {
+          console.log('[KAKAO_OAUTH] openBrowserAsync resolved')
+        }
         cancelTimer = setTimeout(finishCancel, cancelDelayMs)
       })
       .catch(() => {
+        if (DEBUG_KAKAO_OAUTH) {
+          console.log('[KAKAO_OAUTH] openBrowserAsync rejected')
+        }
         if (cancelTimer) clearTimeout(cancelTimer)
         finishCancel()
       })
   })
+}
+
+/**
+ * openAuthSessionAsync 결과가 cancel/dismiss 여도 딥링크가 늦게 도착하는 Android 레이스를 보정한다.
+ */
+async function openKakaoOAuthWithAuthSessionAndLinkingFallback(
+  kakaoAuthorizeUrl: string,
+  redirectUri: string
+): Promise<WebBrowser.WebBrowserAuthSessionResult> {
+  return await new Promise((resolve) => {
+    let settled = false
+    let fallbackTimer: ReturnType<typeof setTimeout> | undefined
+    let pendingDeepLinkUrl: string | null = null
+
+    const finish = (result: WebBrowser.WebBrowserAuthSessionResult) => {
+      if (settled) return
+      settled = true
+      if (fallbackTimer) clearTimeout(fallbackTimer)
+      sub.remove()
+      resolve(result)
+    }
+
+    const sub = Linking.addEventListener('url', (e) => {
+      const url = e.url
+      if (!isLikelyKakaoCallbackUrl(url, redirectUri)) return
+      pendingDeepLinkUrl = url
+      if (DEBUG_KAKAO_OAUTH) {
+        console.log('[KAKAO_OAUTH] authSession Linking url event received', { url })
+      }
+    })
+
+    void WebBrowser.openAuthSessionAsync(kakaoAuthorizeUrl, redirectUri)
+      .then((result) => {
+        if (result.type === 'success') {
+          finish(result)
+          return
+        }
+
+        // Android에서 dismiss/cancel 직후 딥링크가 도착하는 케이스를 짧게 대기한다.
+        fallbackTimer = setTimeout(() => {
+          if (pendingDeepLinkUrl) {
+            finish({ type: 'success', url: pendingDeepLinkUrl })
+            return
+          }
+          finish(result)
+        }, Platform.OS === 'android' ? 1500 : 300)
+      })
+      .catch(() => {
+        finish({ type: WebBrowser.WebBrowserResultType.CANCEL })
+      })
+  })
+}
+
+function isLikelyKakaoCallbackUrl(url: string, redirectUri: string): boolean {
+  if (!url || (!url.includes('code=') && !url.includes('error='))) return false
+  if (url.startsWith(redirectUri)) return true
+  // 기기/브라우저별로 host(app) 누락 등 URI 형태가 달라질 수 있어 경로 기준으로 보수적으로 허용.
+  return /oauth\/kakao\/callback/i.test(url)
 }
 
 /**
@@ -151,10 +231,6 @@ async function openKakaoOAuthWithBrowserAndLinking(
 function getKakaoOAuthRedirectUri(): string {
   if (Platform.OS === 'web') {
     return AuthSession.makeRedirectUri({ path: 'oauth/kakao/callback' })
-  }
-  const envRedirect = getKakaoOAuthRedirectFromEnvOverride()
-  if (envRedirect) {
-    return envRedirect
   }
   /**
    * Expo Go(StoreClient)는 exp:// redirect 만 나와 카카오에 등록하기 어렵다 → https 콜백 유지.
@@ -171,6 +247,10 @@ function getKakaoOAuthRedirectUri(): string {
       scheme: 'medicheck',
       path: 'oauth/kakao/callback',
     })
+  }
+  const envRedirect = getKakaoOAuthRedirectFromEnvOverride()
+  if (envRedirect) {
+    return envRedirect
   }
   const publicOrigin = resolvePublicHttpsOriginFromApiBase()
   if (publicOrigin) {
@@ -238,6 +318,20 @@ export default function LoginScreen() {
 
   const kakaoMutation = useMutation({
     mutationFn: async () => {
+      if (Platform.OS === 'android') {
+        const token = await kakaoNativeLogin()
+        const accessToken = token?.accessToken?.trim()
+        if (!accessToken) {
+          throw new Error('카카오 네이티브 로그인 토큰이 비어 있습니다.')
+        }
+        if (DEBUG_KAKAO_OAUTH) {
+          console.log('[KAKAO_OAUTH] native kakao login token received', {
+            accessTokenLength: accessToken.length,
+          })
+        }
+        return loginWithKakaoNativeAccessToken(accessToken)
+      }
+
       const kakaoRestApiKey = getKakaoRestApiKey()
       if (!kakaoRestApiKey) {
         throw new Error(
@@ -285,35 +379,78 @@ export default function LoginScreen() {
           state: oauthState,
         }).toString()
 
+      if (DEBUG_KAKAO_OAUTH) {
+        console.log('[KAKAO_OAUTH] before open auth', {
+          redirectUri,
+          useHttpsBrowserBridge,
+          expoReturnUrl,
+          authUrl,
+        })
+      }
+
       const result = useHttpsBrowserBridge
         ? await openKakaoOAuthWithBrowserAndLinking(authUrl, expoReturnUrl)
-        : await WebBrowser.openAuthSessionAsync(authUrl, redirectUri)
+        : await openKakaoOAuthWithAuthSessionAndLinkingFallback(authUrl, redirectUri)
+
+      if (DEBUG_KAKAO_OAUTH) {
+        console.log('[KAKAO_OAUTH] auth result', result)
+      }
 
       if (result.type === 'cancel' || result.type === 'dismiss') {
+        if (DEBUG_KAKAO_OAUTH) {
+          Alert.alert('Kakao Debug', `result.type=${result.type}`)
+        }
         throw new Error('카카오 로그인이 취소되었습니다.')
       }
       if (result.type !== 'success') {
+        if (DEBUG_KAKAO_OAUTH) {
+          Alert.alert('Kakao Debug', `unexpected result.type=${result.type}`)
+        }
         throw new Error('카카오 로그인을 완료할 수 없습니다.')
       }
 
       const { code, state: returnedState, error, errorDescription } =
         parseKakaoCallbackUrl(result.url)
+      if (DEBUG_KAKAO_OAUTH) {
+        console.log('[KAKAO_OAUTH] parsed callback', {
+          codeLength: code?.length ?? 0,
+          returnedState,
+          error,
+          errorDescription,
+          resultUrl: result.url,
+        })
+      }
       if (error) {
+        if (DEBUG_KAKAO_OAUTH) {
+          Alert.alert('Kakao Debug Error', `${error}: ${errorDescription ?? ''}`)
+        }
         throw new Error(
           errorDescription || error || '카카오 인증에 실패했습니다.'
         )
       }
       if (!code) {
+        if (DEBUG_KAKAO_OAUTH) {
+          Alert.alert('Kakao Debug', '인가 코드 없음')
+        }
         throw new Error(
           '카카오 인가 코드가 없습니다. 카카오 콘솔의 Redirect URI가 앱과 동일한지 확인하세요.'
         )
       }
       if (returnedState !== oauthState) {
+        if (DEBUG_KAKAO_OAUTH) {
+          Alert.alert('Kakao Debug', 'state mismatch')
+        }
         throw new Error(
           '카카오 OAuth state가 일치하지 않습니다. 다시 시도해 주세요.'
         )
       }
 
+      if (DEBUG_KAKAO_OAUTH) {
+        console.log('[KAKAO_OAUTH] calling backend loginWithKakao', {
+          codeLength: code.length,
+          redirectUri,
+        })
+      }
       return loginWithKakao(code, redirectUri)
     },
     onSuccess: async (data) => {

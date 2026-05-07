@@ -11,15 +11,75 @@ try {
   require('dotenv').config({ quiet: true })
 } catch (_) {}
 
-const appJson = require('./app.json')
+const nativeKakaoAppKey =
+  process.env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY ||
+  process.env.EXPO_PUBLIC_KAKAO_REST_API_KEY ||
+  ''
+const basePlugins = [
+  'expo-router',
+  [
+    'expo-location',
+    {
+      locationWhenInUsePermission: '주변 병원을 찾기 위해 위치 정보가 필요합니다.',
+    },
+  ],
+]
+const plugins = [
+  ...basePlugins,
+  [
+    '@react-native-seoul/kakao-login',
+    {
+      kakaoAppKey: nativeKakaoAppKey,
+      kotlinVersion: '2.0.21',
+    },
+  ],
+  [
+    'expo-build-properties',
+    {
+      android: {
+        extraMavenRepos: ['https://devrepo.kakao.com/nexus/content/groups/public/'],
+      },
+    },
+  ],
+]
 
 module.exports = {
   expo: {
-    ...appJson.expo,
+    name: 'MediCheck',
+    owner: 'snowrabbit',
+    slug: 'medi-check',
+    version: '1.0.0',
+    orientation: 'portrait',
+    icon: './assets/icon.png',
+    userInterfaceStyle: 'light',
+    splash: {
+      image: './assets/splash.png',
+      resizeMode: 'contain',
+      backgroundColor: '#0EA5E9',
+    },
+    assetBundlePatterns: ['**/*'],
+    ios: {
+      supportsTablet: true,
+      bundleIdentifier: 'com.medicheck.app',
+      config: {
+        usesNonExemptEncryption: false,
+      },
+      infoPlist: {
+        NSLocationWhenInUseUsageDescription: '주변 병원을 찾기 위해 위치 정보가 필요합니다.',
+      },
+    },
+    android: {
+      adaptiveIcon: {
+        foregroundImage: './assets/adaptive-icon.png',
+        backgroundColor: '#0EA5E9',
+      },
+      package: 'com.medicheck.app',
+      permissions: ['ACCESS_FINE_LOCATION', 'ACCESS_COARSE_LOCATION'],
+    },
     /** expo-router / Linking — scheme 없으면 createURL 등에서 경고·크래시 가능 */
-    scheme: appJson.expo.scheme || 'medicheck',
+    scheme: 'medicheck',
+    plugins,
     extra: {
-      ...(appJson.expo.extra || {}),
       eas: {
         projectId: 'c0409b3e-1f1f-44af-a388-ba431ca0bf9b',
       },
@@ -41,6 +101,8 @@ module.exports = {
         process.env.EXPO_PUBLIC_KAKAO_REST_API_KEY ||
         process.env.VITE_KAKAO_REST_API_KEY ||
         '',
+      /** 카카오 네이티브 SDK 앱 키(없으면 REST 키를 임시 사용). */
+      kakaoNativeAppKey: nativeKakaoAppKey,
     },
   },
 }

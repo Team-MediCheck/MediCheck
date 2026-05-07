@@ -61,6 +61,29 @@ public class KakaoOAuthService {
         }
     }
 
+    /**
+     * 네이티브 SDK에서 발급된 access token으로 카카오 사용자 정보를 조회합니다.
+     */
+    public KakaoUserInfo getUserInfoByAccessToken(String accessToken) {
+        if (accessToken == null || accessToken.isBlank()) {
+            throw new IllegalArgumentException("카카오 액세스 토큰이 없습니다.");
+        }
+        if (props.getRestApiKey() == null || props.getRestApiKey().isBlank()) {
+            throw new IllegalStateException("카카오 로그인 REST API 키가 설정되지 않았습니다. kakao.oauth.rest-api-key를 확인하세요.");
+        }
+        try {
+            log.info("Kakao native token user info start: accessTokenLength={}", accessToken.length());
+            return fetchUserInfo(accessToken);
+        } catch (HttpStatusCodeException e) {
+            String responseBody = e.getResponseBodyAsString();
+            log.warn("Kakao API error(native): status={}, body={}", e.getStatusCode(), responseBody);
+            throw new IllegalArgumentException("카카오 사용자 정보를 가져오지 못했습니다. access token 상태를 확인해 주세요.");
+        } catch (RestClientException e) {
+            log.warn("Kakao API communication error(native)", e);
+            throw new KakaoOAuthCommunicationException("카카오 로그인 통신 중 오류가 발생했습니다.", e);
+        }
+    }
+
     private String fetchAccessToken(String code, String redirectUri) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
