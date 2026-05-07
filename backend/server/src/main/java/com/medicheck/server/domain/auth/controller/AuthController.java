@@ -4,6 +4,7 @@ import com.medicheck.server.global.config.KakaoOAuthProperties;
 import com.medicheck.server.domain.user.entity.User;
 import com.medicheck.server.domain.auth.service.AuthService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -28,6 +29,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
+@Slf4j
 public class AuthController {
 
     private final AuthService authService;
@@ -83,33 +85,44 @@ public class AuthController {
     public ResponseEntity<Void> kakaoAuthorize(@RequestParam String redirectUri) {
         String restApiKey = kakaoOAuthProperties.getRestApiKey();
         if (restApiKey == null || restApiKey.isBlank()) {
+            log.warn("Kakao authorize blocked: missing rest api key");
             return ResponseEntity.status(503).build();
         }
         if (redirectUri == null || redirectUri.isBlank()) {
+            log.warn("Kakao authorize blocked: empty redirectUri");
             return ResponseEntity.badRequest().build();
         }
-        if (!isAllowedRedirectUri(redirectUri, kakaoOAuthProperties.getAllowedRedirectUris())) {
+        String resolvedRedirectUri = resolveAllowedRedirectUri(redirectUri, kakaoOAuthProperties.getAllowedRedirectUris());
+        if (resolvedRedirectUri == null) {
+            log.warn("Kakao authorize blocked: disallowed redirectUri={}", redirectUri);
             return ResponseEntity.status(403).build();
         }
         String location = "https://kauth.kakao.com/oauth/authorize?client_id="
                 + URLEncoder.encode(restApiKey, StandardCharsets.UTF_8)
                 + "&redirect_uri="
-                + URLEncoder.encode(redirectUri, StandardCharsets.UTF_8)
+                + URLEncoder.encode(resolvedRedirectUri, StandardCharsets.UTF_8)
                 + "&response_type=code";
+        log.info("Kakao authorize redirect prepared: redirectUri={}", resolvedRedirectUri);
         return ResponseEntity.status(302).header(HttpHeaders.LOCATION, location).build();
     }
 
-    private boolean isAllowedRedirectUri(String redirectUri, List<String> allowedRedirectUris) {
+    private String resolveAllowedRedirectUri(String redirectUri, List<String> allowedRedirectUris) {
         if (allowedRedirectUris == null || allowedRedirectUris.isEmpty()) {
-            return false;
+            return null;
         }
         URI requestedUri = parseAndNormalizeUri(redirectUri);
         if (requestedUri == null) {
-            return false;
+            return null;
         }
         return allowedRedirectUris.stream()
-                .map(this::parseAndNormalizeUri)
-                .anyMatch(allowed -> allowed != null && allowed.equals(requestedUri));
+                .filter(value -> value != null && !value.isBlank())
+                .filter(value -> {
+                    URI allowed = parseAndNormalizeUri(value);
+                    return allowed != null && allowed.equals(requestedUri);
+                })
+                .findFirst()
+                .map(String::trim)
+                .orElse(null);
     }
 
     private URI parseAndNormalizeUri(String value) {
@@ -158,13 +171,22 @@ public class AuthController {
             return ResponseEntity.badRequest()
                     .body(Map.of("error", "invalid_input", "message", "카카오 로그인 redirectUri가 없습니다."));
         }
+        String resolvedRedirectUri = resolveAllowedRedirectUri(redirectUri, kakaoOAuthProperties.getAllowedRedirectUris());
+        if (resolvedRedirectUri == null) {
+            log.warn("Kakao login blocked: disallowed redirectUri={}", redirectUri);
+            return ResponseEntity.status(403)
+                    .body(Map.of("error", "forbidden_redirect_uri", "message", "허용되지 않은 redirectUri 입니다."));
+        }
         try {
-            String token = authService.loginWithKakaoCode(code, redirectUri);
+            log.info("Kakao login requested: redirectUri={}, codeLength={}", resolvedRedirectUri, code.length());
+            String token = authService.loginWithKakaoCode(code, resolvedRedirectUri);
             return ResponseEntity.ok(Map.of("token", token));
         } catch (IllegalStateException e) {
+            log.error("Kakao login config error: redirectUri={}", resolvedRedirectUri, e);
             return ResponseEntity.status(503)
                     .body(Map.of("error", "kakao_config_error", "message", e.getMessage()));
         } catch (IllegalArgumentException e) {
+            log.warn("Kakao login failed: redirectUri={}, reason={}", resolvedRedirectUri, e.getMessage());
             return ResponseEntity.status(401)
                     .body(Map.of("error", "kakao_login_failed", "message", e.getMessage()));
         }
