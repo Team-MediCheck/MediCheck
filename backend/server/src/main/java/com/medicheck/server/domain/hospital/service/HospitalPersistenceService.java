@@ -62,12 +62,16 @@ public class HospitalPersistenceService {
                     if (existingCodes.contains(ykiho)) return false;
                     if (!seenCodes.add(ykiho)) return false; // 배치 내 중복 제거
                     String name = trim(item.getYadmNm(), 200);
-                    return name != null && !name.isBlank();
+                    if (name == null || name.isBlank()) return false;
+                    // DB location NOT NULL 및 근처 검색: 신규 행은 유효 위·경도가 있어야 함
+                    return hasParsableLatLng(item);
                 })
                 .map(this::toHospital)
                 .toList();
 
-        hospitalRepository.saveAll(toSave);
+        if (!toSave.isEmpty()) {
+            hospitalRepository.saveAll(toSave);
+        }
         return toSave.size();
     }
 
@@ -119,6 +123,13 @@ public class HospitalPersistenceService {
     }
 
     public record PersistCounts(int updated, int saved) {}
+
+    private static boolean hasParsableLatLng(HiraHospItem item) {
+        if (item == null) return false;
+        BigDecimal lat = parseBigDecimal(toPosString(item.getYPos()));
+        BigDecimal lng = parseBigDecimal(toPosString(item.getXPos()));
+        return lat != null && lng != null;
+    }
 
     private void applyHiraToHospital(HiraHospItem item, Hospital h) {
         h.updateFromHira(

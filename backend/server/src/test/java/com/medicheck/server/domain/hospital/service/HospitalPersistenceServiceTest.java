@@ -91,4 +91,37 @@ class HospitalPersistenceServiceTest {
         assertThat(updated).isZero();
         verify(hospitalRepository, never()).findAllByPublicCodeIn(any());
     }
+
+    @Test
+    @DisplayName("saveNewHospitals - 좌표가 없으면 신규 저장하지 않는다(DB location NOT NULL)")
+    void saveNewHospitals_skipsWhenNoCoordinates() {
+        HiraHospItem item = new HiraHospItem();
+        item.setYkiho("NO_COORD");
+        item.setYadmNm("무좌표병원");
+        item.setAddr("주소만있음");
+
+        given(hospitalRepository.findAllByPublicCodeIn(List.of("NO_COORD"))).willReturn(List.of());
+
+        int saved = hospitalPersistenceService.saveNewHospitals(List.of(item));
+
+        assertThat(saved).isZero();
+        verify(hospitalRepository, never()).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("saveNewHospitals - 위경도가 있으면 saveAll 한다")
+    void saveNewHospitals_persistsWhenCoordinatesPresent() {
+        HiraHospItem item = new HiraHospItem();
+        item.setYkiho("HAS_COORD");
+        item.setYadmNm("좌표병원");
+        item.setXPos("128.5");
+        item.setYPos("35.9");
+
+        given(hospitalRepository.findAllByPublicCodeIn(List.of("HAS_COORD"))).willReturn(List.of());
+
+        int saved = hospitalPersistenceService.saveNewHospitals(List.of(item));
+
+        assertThat(saved).isEqualTo(1);
+        verify(hospitalRepository).saveAll(any());
+    }
 }
