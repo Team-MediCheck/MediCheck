@@ -98,6 +98,9 @@ class HospitalControllerSyncSecurityTest {
         mockMvc.perform(post("/api/hospitals/sync/full").param("numOfRows", "10"))
                 .andExpect(status().isForbidden());
 
+        mockMvc.perform(post("/api/hospitals/sync/top5/all"))
+                .andExpect(status().isForbidden());
+
         mockMvc.perform(post("/api/hospitals/sync/top5/region").param("addressKeyword", "구미"))
                 .andExpect(status().isForbidden());
 
@@ -172,6 +175,10 @@ class HospitalControllerSyncSecurityTest {
                         .param("numOfRows", "10"))
                 .andExpect(status().isOk());
 
+        mockMvc.perform(post("/api/hospitals/sync/top5/all")
+                        .header("X-Admin-Key", "test-admin-key"))
+                .andExpect(status().isOk());
+
         mockMvc.perform(post("/api/hospitals/sync/top5/region")
                         .header("X-Admin-Key", "test-admin-key")
                         .param("addressKeyword", "구미"))
@@ -189,7 +196,7 @@ class HospitalControllerSyncSecurityTest {
         then(hospitalEvaluationSyncService).should(times(2)).syncAll(any());
         then(hospitalEvaluationSyncService).should().syncOne("some-ykiho");
         then(hospitalEvaluationSyncService).should().syncByAddressKeyword("구미", null);
-        then(hospitalTop5SyncService).should().syncAllByHospital(anyInt(), anyInt());
+        then(hospitalTop5SyncService).should(times(2)).syncAllByHospital(anyInt(), anyInt());
         then(hospitalTop5SyncService).should().syncByAddressKeyword("구미", null);
         then(hospitalTop5SyncService).should().syncOne("some-ykiho");
     }

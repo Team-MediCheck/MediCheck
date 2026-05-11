@@ -49,6 +49,8 @@ public class HospitalService {
     private static final int NEARBY_MAX_RESULTS = 500;
     /** 근처 병원 조회에서 허용할 최대 반경 (미터) — 예: 50km */
     private static final double MAX_RADIUS_METERS = 50_000;
+    /** 증상별 병원 검색: 사용자 lat/lng가 있을 때만 적용하는 최대 반경 (미터) */
+    private static final double SYMPTOM_SEARCH_MAX_RADIUS_METERS = 5_000;
     private static final double EARTH_RADIUS_METERS = 6_371_000.0;
 
     /**
@@ -75,8 +77,9 @@ public class HospitalService {
     /**
      * 증상(또는 질환) 키워드로 검색합니다. HIRA 동기화된 병원진료정보 Top5(상위 5개 질병명) 필드와 부분 일치하는 병원만 반환합니다.
      * 토큰은 공백·쉼표로 나누며, 토큰 하나라도 질병명에 매칭되면 포함(OR)합니다.
-     * 정렬: 매칭된 질병명 슬롯이 더 상위(1위→5위)인 병원이 먼저 오고, 동일 슬롯이면 사용자 좌표(lat/lng) 기준 거리 오름차순입니다.
-     * lat/lng가 없으면 거리는 무한대로 두어 이름 순으로만 타이브레이크합니다.
+     * 사용자 좌표(lat/lng)가 있으면 Haversine 거리 5km 이내 병원만 포함합니다.
+     * 정렬: 좌표가 있으면 거리 오름차순을 먼저 적용한 뒤, 같은 거리에서는 매칭 슬롯(1위→5위)이 앞선 병원이 먼저입니다.
+     * 좌표가 없으면 반경 필터 없이 슬롯 우선·거리는 무한대로 두고 이름으로 타이브레이크합니다.
      */
     public Page<HospitalResponse> findAllBySymptom(
             String symptom,
@@ -113,6 +116,7 @@ public class HospitalService {
         List<HospitalClinicTop5> top5Rows =
                 hospitalClinicTop5Repository.findAllByHospitalIdInWithHospitalFetch(idList);
 
+        boolean hasUserCoords = userLat != null && userLng != null;
         List<RankedHospital> ranked = new ArrayList<>();
         for (HospitalClinicTop5 t : top5Rows) {
             Hospital h = t.getHospital();
@@ -121,13 +125,27 @@ public class HospitalService {
                 continue;
             }
             double distM = haversineMeters(userLat, userLng, h.getLatitude(), h.getLongitude());
+            if (hasUserCoords) {
+                if (!Double.isFinite(distM) || distM > SYMPTOM_SEARCH_MAX_RADIUS_METERS) {
+                    continue;
+                }
+            }
             ranked.add(new RankedHospital(rank, distM, h));
         }
 
-        ranked.sort(Comparator
-                .comparingInt(RankedHospital::matchRank)
-                .thenComparingDouble(RankedHospital::distanceMeters)
-                .thenComparing(r -> r.hospital().getName(), Comparator.nullsLast(String::compareTo)));
+        Comparator<RankedHospital> byName = Comparator.comparing(
+                r -> r.hospital().getName(), Comparator.nullsLast(String::compareTo));
+        if (hasUserCoords) {
+            ranked.sort(Comparator
+                    .comparingDouble(RankedHospital::distanceMeters)
+                    .thenComparingInt(RankedHospital::matchRank)
+                    .thenComparing(byName));
+        } else {
+            ranked.sort(Comparator
+                    .comparingInt(RankedHospital::matchRank)
+                    .thenComparingDouble(RankedHospital::distanceMeters)
+                    .thenComparing(byName));
+        }
 
         long total = ranked.size();
         int pageNumber = pageable.getPageNumber();

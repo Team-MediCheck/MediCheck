@@ -94,8 +94,8 @@ public class HospitalController {
             summary = "증상·질환 기준 병원 검색",
             description = "병원진료정보 Top5(상위 5개 질병명) 중 하나라도 symptom 토큰과 부분 일치하면 포함됩니다. "
                     + "공백·쉼표로 여러 토큰을 넣으면 하나라도 매칭되면 포함(OR)합니다. "
-                    + "정렬: 매칭된 슬롯이 더 상위(1위→5위)인 병원이 먼저이며, 같은 슬롯이면 lat·lng 기준 거리 가까운 순입니다. "
-                    + "lat·lng를 생략하면 거리 정렬 없이 이름 순으로만 타이브레이크합니다."
+                    + "lat·lng가 있으면 반경 5km 이내만 반환합니다. 정렬은 거리 가까운 순 우선, 같은 거리에서는 매칭 슬롯(1위→5위)이 앞선 병원이 먼저입니다. "
+                    + "lat·lng를 생략하면 반경 제한 없이 슬롯 우선·이름 순 타이브레이크입니다."
     )
     @GetMapping("/search/symptom")
     public ResponseEntity<Page<HospitalResponse>> searchBySymptom(
@@ -315,6 +315,46 @@ public class HospitalController {
             log.error("HIRA 통합 동기화 실패 errorId={}", errorId, e);
             return ResponseEntity.status(500).body(Map.of(
                     "error", "sync-full failed",
+                    "message", "internal server error",
+                    "errorId", errorId
+            ));
+        }
+    }
+
+    /**
+     * 병원·평가 없이 진료 Top5만 DB 병원 순회 동기화합니다.
+     * X-Admin-Key 헤더 필요.
+     * POST /api/hospitals/sync/top5/all
+     * POST /api/hospitals/sync/top5/all?maxTop5Attempts=50000&top5PageSize=100
+     *
+     * <p>{@code maxTop5Attempts} 생략 시 app.hira.sync-full.default-max-top5-attempts(기본 5000)와 동일 규칙.
+     */
+    @Operation(
+            summary = "심평원 진료 Top5 전체 동기화",
+            description = "관리자 키 필요. 전국 병원/평가는 건너뛰고, ykiho가 있는 병원만 Top5 API를 순회합니다. "
+                    + "무제한 호출 방지용 기본 상한이 적용되며(maxTop5Attempts 생략 시 설정값), 전체 순회에는 큰 값을 지정하세요."
+    )
+    @PostMapping("/sync/top5/all")
+    public ResponseEntity<?> syncTop5All(
+            @RequestParam(required = false) Integer maxTop5Attempts,
+            @RequestParam(defaultValue = "100") int top5PageSize
+    ) {
+        try {
+            int defaultCap = syncFullDefaultMaxTop5Attempts > 0 ? syncFullDefaultMaxTop5Attempts : 5000;
+            int top5Cap = (maxTop5Attempts != null && maxTop5Attempts > 0) ? maxTop5Attempts : defaultCap;
+            var top5 = hospitalTop5SyncService.syncAllByHospital(top5Cap, top5PageSize);
+            return ResponseEntity.ok(Map.of(
+                    "hospitalsAttempted", top5.hospitalsAttempted(),
+                    "hospitalsSucceeded", top5.hospitalsSucceeded(),
+                    "maxTop5AttemptsApplied", top5Cap,
+                    "top5PageSize", top5PageSize,
+                    "message", "진료 Top5 동기화 완료"
+            ));
+        } catch (Exception e) {
+            String errorId = java.util.UUID.randomUUID().toString();
+            log.error("진료 Top5 전체 동기화 실패 errorId={}", errorId, e);
+            return ResponseEntity.status(500).body(Map.of(
+                    "error", "sync-top5-all failed",
                     "message", "internal server error",
                     "errorId", errorId
             ));

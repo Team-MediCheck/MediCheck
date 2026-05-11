@@ -19,7 +19,10 @@ import * as AuthSession from 'expo-auth-session'
 import * as Linking from 'expo-linking'
 import * as WebBrowser from 'expo-web-browser'
 import { useAuthStore } from '@/store/authStore'
-import { login as kakaoNativeLogin } from '@react-native-seoul/kakao-login'
+import {
+  login as kakaoNativeLogin,
+  loginWithKakaoAccount as kakaoNativeLoginWithKakaoAccount,
+} from '@react-native-seoul/kakao-login'
 import { login, getMe, loginWithKakao, loginWithKakaoNativeAccessToken } from '@/lib/api'
 
 type Extra = {
@@ -35,6 +38,7 @@ const KAKAO_OAUTH_CALLBACK_PATH = '/oauth/kakao/callback'
 const ANDROID_OAUTH_CANCEL_DELAY_MS = 1500
 const IOS_OAUTH_CANCEL_DELAY_MS = 300
 const DEBUG_KAKAO_OAUTH = true
+const USE_ANDROID_KAKAO_NATIVE_SDK = true
 
 /**
  * Standalone / Dev Client 전용. 호스트 `app`으로 두어 `new URL(...)` 파싱 시 pathname 이 `/oauth/kakao/callback` 이 되게 함.
@@ -117,14 +121,37 @@ async function openKakaoOAuthWithBrowserAndLinking(
 
     const finishCancel = () => {
       if (settled) return
-      settled = true
-      sub.remove()
-      if (DEBUG_KAKAO_OAUTH) {
-        console.log('[KAKAO_OAUTH] openBrowserAsync cancel timeout', {
-          returnPrefix,
+      // 일부 기기에서는 Linking 이벤트가 손실되고 initialURL만 남는 경우가 있어 마지막으로 확인한다.
+      void Linking.getInitialURL()
+        .then((initialUrl) => {
+          if (
+            !settled &&
+            initialUrl &&
+            initialUrl.startsWith(returnPrefix) &&
+            (initialUrl.includes('code=') || initialUrl.includes('error='))
+          ) {
+            settled = true
+            sub.remove()
+            resolve({ type: 'success', url: initialUrl })
+            return
+          }
+          if (settled) return
+          settled = true
+          sub.remove()
+          if (DEBUG_KAKAO_OAUTH) {
+            console.log('[KAKAO_OAUTH] openBrowserAsync cancel timeout', {
+              returnPrefix,
+              initialUrl,
+            })
+          }
+          resolve({ type: WebBrowser.WebBrowserResultType.CANCEL })
         })
-      }
-      resolve({ type: WebBrowser.WebBrowserResultType.CANCEL })
+        .catch(() => {
+          if (settled) return
+          settled = true
+          sub.remove()
+          resolve({ type: WebBrowser.WebBrowserResultType.CANCEL })
+        })
     }
 
     const sub = Linking.addEventListener('url', (e) => {
@@ -148,7 +175,7 @@ async function openKakaoOAuthWithBrowserAndLinking(
      * CANCEL 은 짧게 미루어 딥링크를 먼저 처리하게 한다.
      */
     // 일부 Android 기기/네트워크에서는 딥링크 이벤트가 늦게 도착해 cancel 오탐이 나므로 여유를 둔다.
-    const cancelDelayMs = Platform.OS === 'android' ? ANDROID_OAUTH_CANCEL_DELAY_MS : IOS_OAUTH_CANCEL_DELAY_MS
+    const cancelDelayMs = Platform.OS === 'android' ? 5000 : IOS_OAUTH_CANCEL_DELAY_MS
 
     void WebBrowser.openBrowserAsync(kakaoAuthorizeUrl)
       .then(() => {
@@ -238,10 +265,11 @@ function getKakaoOAuthRedirectUri(): string {
    * 콜백을 앱에 넘기며 시트가 닫히도록 한다.
    */
   const exec = Constants.executionEnvironment
-  if (
-    exec === ExecutionEnvironment.Standalone ||
-    exec === ExecutionEnvironment.Bare
-  ) {
+  const shouldUseNativeRedirectForStandalone =
+    (exec === ExecutionEnvironment.Standalone || exec === ExecutionEnvironment.Bare) &&
+    (Platform.OS !== 'android' || USE_ANDROID_KAKAO_NATIVE_SDK)
+
+  if (shouldUseNativeRedirectForStandalone) {
     return AuthSession.makeRedirectUri({
       native: KAKAO_OAUTH_NATIVE_APP_REDIRECT_URI,
       scheme: 'medicheck',
@@ -290,6 +318,21 @@ function parseKakaoCallbackUrl(url: string): {
   }
 }
 
+function getAlternateWwwRedirectUri(redirectUri: string): string | null {
+  try {
+    const u = new URL(redirectUri)
+    if (u.protocol !== 'https:') return null
+    if (u.hostname.startsWith('www.')) {
+      u.hostname = u.hostname.replace(/^www\./, '')
+      return u.toString()
+    }
+    u.hostname = `www.${u.hostname}`
+    return u.toString()
+  } catch {
+    return null
+  }
+}
+
 export default function LoginScreen() {
   const router = useRouter()
   const setAuth = useAuthStore((state) => state.setAuth)
@@ -316,20 +359,102 @@ export default function LoginScreen() {
     },
   })
 
+  /** 카카오 로그인 UI는 비활성화됨. 백엔드·OAuth 플로우 재노출 시 버튼에서 `mutate()` 연결 */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- mutation 객체 보존(버튼 없음)
   const kakaoMutation = useMutation({
     mutationFn: async () => {
-      if (Platform.OS === 'android') {
-        const token = await kakaoNativeLogin()
-        const accessToken = token?.accessToken?.trim()
-        if (!accessToken) {
-          throw new Error('카카오 네이티브 로그인 토큰이 비어 있습니다.')
+      if (Platform.OS === 'android' && USE_ANDROID_KAKAO_NATIVE_SDK) {
+        const loginWithNativeToken = async (accessToken: string) => {
+          if (DEBUG_KAKAO_OAUTH) {
+            console.log('[KAKAO_OAUTH] before backend loginWithKakaoNativeAccessToken')
+          }
+          const response = await loginWithKakaoNativeAccessToken(accessToken)
+          if (DEBUG_KAKAO_OAUTH) {
+            console.log('[KAKAO_OAUTH] after backend loginWithKakaoNativeAccessToken', {
+              hasToken: Boolean(response?.token),
+            })
+          }
+          return response
         }
-        if (DEBUG_KAKAO_OAUTH) {
-          console.log('[KAKAO_OAUTH] native kakao login token received', {
-            accessTokenLength: accessToken.length,
-          })
+
+        const getNativeAccessTokenOrThrow = async (
+          strategy: 'talk' | 'account'
+        ): Promise<string> => {
+          const strategyLabel = strategy === 'talk' ? 'kakaoTalk' : 'kakaoAccount'
+          const loginFn =
+            strategy === 'talk' ? kakaoNativeLogin : kakaoNativeLoginWithKakaoAccount
+          const token = await Promise.race([
+            loginFn(),
+            new Promise<never>((_, reject) =>
+              setTimeout(
+                () =>
+                  reject(
+                    new Error(`카카오 네이티브 로그인 응답 타임아웃(5s) - ${strategyLabel}`)
+                  ),
+                5000
+              )
+            ),
+          ])
+          const accessToken = token?.accessToken?.trim()
+          if (DEBUG_KAKAO_OAUTH) {
+            console.log('[KAKAO_OAUTH] native kakao login response', {
+              strategy: strategyLabel,
+              hasAccessToken: Boolean(accessToken),
+              accessTokenLength: accessToken?.length ?? 0,
+            })
+          }
+          if (!accessToken) {
+            throw new Error(`카카오 네이티브 로그인 토큰이 비어 있습니다. (${strategyLabel})`)
+          }
+          return accessToken
         }
-        return loginWithKakaoNativeAccessToken(accessToken)
+
+        try {
+          if (DEBUG_KAKAO_OAUTH) {
+            console.log('[KAKAO_OAUTH] native kakao login start')
+          }
+          const accessToken = await getNativeAccessTokenOrThrow('talk')
+          return await loginWithNativeToken(accessToken)
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error)
+          const shouldFallbackToKakaoAccount =
+            /user cancelled\.?/i.test(errorMessage) ||
+            /cancel/i.test(errorMessage)
+
+          if (shouldFallbackToKakaoAccount) {
+            if (DEBUG_KAKAO_OAUTH) {
+              console.log('[KAKAO_OAUTH] talk login cancelled; fallback to kakao account login', {
+                errorMessage,
+              })
+            }
+            try {
+              const accountAccessToken = await getNativeAccessTokenOrThrow('account')
+              return await loginWithNativeToken(accountAccessToken)
+            } catch (accountError) {
+              const accountErrorMessage =
+                accountError instanceof Error ? accountError.message : String(accountError)
+              if (DEBUG_KAKAO_OAUTH) {
+                console.log('[KAKAO_OAUTH] kakao account fallback failed', {
+                  accountErrorMessage,
+                  accountError,
+                })
+                Alert.alert('Kakao Native Debug Error', accountErrorMessage)
+              }
+              throw accountError instanceof Error
+                ? accountError
+                : new Error(accountErrorMessage)
+            }
+          }
+
+          if (DEBUG_KAKAO_OAUTH) {
+            console.log('[KAKAO_OAUTH] native kakao login failed', {
+              errorMessage,
+              error,
+            })
+            Alert.alert('Kakao Native Debug Error', errorMessage)
+          }
+          throw error instanceof Error ? error : new Error(errorMessage)
+        }
       }
 
       const kakaoRestApiKey = getKakaoRestApiKey()
@@ -357,40 +482,63 @@ export default function LoginScreen() {
        * SPA 콜백만 뜨고 `openAuthSessionAsync` 가 URL 을 앱에 넘기지 못한 채 멈추는 경우가 많다(Android).
        */
       const useHttpsBrowserBridge =
+        Platform.OS === 'ios' &&
         redirectUri.startsWith('https://') &&
         !redirectUri.includes('auth.expo.io')
 
       /** `getDefaultReturnUrl()` 은 `/--/expo-auth-session` 이라 expo-router 에 매칭 라우트가 없어 Unmatched Route 가 난다 */
       const expoReturnUrl = Linking.createURL('/login')
-      const oauthState = useHttpsBrowserBridge
-        ? `${KAKAO_OAUTH_EXPO_STATE_PREFIX}__${encodeURIComponent(expoReturnUrl)}__${await Crypto.randomUUID()}`
-        : `${KAKAO_OAUTH_EXPO_STATE_PREFIX}.${await Crypto.randomUUID()}`
+      const runAuth = async (targetRedirectUri: string) => {
+        const oauthState = useHttpsBrowserBridge
+          ? `${KAKAO_OAUTH_EXPO_STATE_PREFIX}__${encodeURIComponent(expoReturnUrl)}__${await Crypto.randomUUID()}`
+          : `${KAKAO_OAUTH_EXPO_STATE_PREFIX}.${await Crypto.randomUUID()}`
 
-      const authUrl =
-        'https://kauth.kakao.com/oauth/authorize?' +
-        new URLSearchParams({
-          client_id: kakaoRestApiKey,
-          redirect_uri: redirectUri,
-          response_type: 'code',
-          // 카카오 세션이 남아 있어도 계정 선택/재로그인을 유도한다.
-          prompt: 'login',
-          // 카카오톡 앱 간편로그인 단계를 건너뛰고 카카오계정 로그인 화면으로 바로 진입한다.
-          through_account: 'true',
-          state: oauthState,
-        }).toString()
+        const authUrl =
+          'https://kauth.kakao.com/oauth/authorize?' +
+          new URLSearchParams({
+            client_id: kakaoRestApiKey,
+            redirect_uri: targetRedirectUri,
+            response_type: 'code',
+            prompt: 'login',
+            through_account: 'true',
+            state: oauthState,
+          }).toString()
 
-      if (DEBUG_KAKAO_OAUTH) {
-        console.log('[KAKAO_OAUTH] before open auth', {
-          redirectUri,
-          useHttpsBrowserBridge,
-          expoReturnUrl,
-          authUrl,
-        })
+        const startUrl = authUrl
+        if (DEBUG_KAKAO_OAUTH) {
+          console.log('[KAKAO_OAUTH] before open auth', {
+            redirectUri: targetRedirectUri,
+            useHttpsBrowserBridge,
+            expoReturnUrl,
+            authUrl,
+            startUrl,
+          })
+        }
+        const result = useHttpsBrowserBridge
+          ? await openKakaoOAuthWithBrowserAndLinking(startUrl, expoReturnUrl)
+          : await openKakaoOAuthWithAuthSessionAndLinkingFallback(startUrl, targetRedirectUri)
+        return { result, oauthState, redirectUri: targetRedirectUri }
       }
 
-      const result = useHttpsBrowserBridge
-        ? await openKakaoOAuthWithBrowserAndLinking(authUrl, expoReturnUrl)
-        : await openKakaoOAuthWithAuthSessionAndLinkingFallback(authUrl, redirectUri)
+      let { result, oauthState, redirectUri: effectiveRedirectUri } = await runAuth(redirectUri)
+
+      if (
+        Platform.OS === 'android' &&
+        (result.type === 'cancel' || result.type === 'dismiss')
+      ) {
+        const alternateRedirectUri = getAlternateWwwRedirectUri(redirectUri)
+        if (alternateRedirectUri && alternateRedirectUri !== redirectUri) {
+          if (DEBUG_KAKAO_OAUTH) {
+            console.log('[KAKAO_OAUTH] retry with alternate redirect host', {
+              from: redirectUri,
+              to: alternateRedirectUri,
+              prevResultType: result.type,
+            })
+          }
+          ;({ result, oauthState, redirectUri: effectiveRedirectUri } =
+            await runAuth(alternateRedirectUri))
+        }
+      }
 
       if (DEBUG_KAKAO_OAUTH) {
         console.log('[KAKAO_OAUTH] auth result', result)
@@ -398,7 +546,19 @@ export default function LoginScreen() {
 
       if (result.type === 'cancel' || result.type === 'dismiss') {
         if (DEBUG_KAKAO_OAUTH) {
-          Alert.alert('Kakao Debug', `result.type=${result.type}`)
+          const initialUrl = await Linking.getInitialURL().catch(() => null)
+          const resultUrl =
+            'url' in result && typeof result.url === 'string' ? result.url : null
+          console.log('[KAKAO_OAUTH] cancel/dismiss debug', {
+            resultType: result.type,
+            resultUrl,
+            initialUrl,
+            redirectUri: effectiveRedirectUri,
+          })
+          Alert.alert(
+            'Kakao Debug Cancel',
+            `type=${result.type}\nresultUrl=${resultUrl ?? 'null'}\ninitialUrl=${initialUrl ?? 'null'}\nredirectUri=${effectiveRedirectUri}`
+          )
         }
         throw new Error('카카오 로그인이 취소되었습니다.')
       }
@@ -448,10 +608,10 @@ export default function LoginScreen() {
       if (DEBUG_KAKAO_OAUTH) {
         console.log('[KAKAO_OAUTH] calling backend loginWithKakao', {
           codeLength: code.length,
-          redirectUri,
+          redirectUri: effectiveRedirectUri,
         })
       }
-      return loginWithKakao(code, redirectUri)
+      return loginWithKakao(code, effectiveRedirectUri)
     },
     onSuccess: async (data) => {
       const user = await getMe(data.token)
@@ -478,19 +638,6 @@ export default function LoginScreen() {
     }
     loginMutation.mutate()
   }
-
-  const handleKakaoLogin = () => {
-    if (Platform.OS === 'web') {
-      Alert.alert(
-        '안내',
-        'Expo 웹에서는 카카오 리다이렉트가 제한될 수 있습니다. Vite 웹(frontend) 로그인 또는 iOS/Android 앱을 이용해 주세요.'
-      )
-      return
-    }
-    kakaoMutation.mutate()
-  }
-
-  const kakaoBusy = kakaoMutation.isPending
 
   return (
     <KeyboardAvoidingView
@@ -551,17 +698,6 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.kakaoButton, kakaoBusy && styles.buttonDisabled]}
-            onPress={handleKakaoLogin}
-            disabled={kakaoBusy}
-          >
-            {kakaoBusy ? (
-              <ActivityIndicator color="#3C1E1E" />
-            ) : (
-              <Text style={styles.kakaoButtonText}>카카오로 로그인</Text>
-            )}
-          </TouchableOpacity>
         </View>
 
         <View style={styles.footer}>
@@ -644,18 +780,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
-  },
-  kakaoButton: {
-    backgroundColor: '#FEE500',
-    height: 52,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  kakaoButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#3C1E1E',
   },
   footer: {
     flexDirection: 'row',

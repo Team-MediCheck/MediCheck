@@ -117,7 +117,7 @@ export async function getHospitals(params?: {
   return fetchApi(`/hospitals?${searchParams}`)
 }
 
-/** HIRA Top5(진료량 상위 5개 질병명)와 부분 일치하는 병원만 페이지 조회. 서버는 1~5위 슬롯 순·같은 슬롯은 거리순 정렬 */
+/** HIRA Top5 질병명 부분 일치 병원 페이지. lat/lng 있으면 5km 이내만, 거리순 우선·같은 거리는 Top5 슬롯(1~5위) 순 */
 export async function getHospitalsBySymptom(params: {
   symptom: string
   lat?: number
