@@ -2,6 +2,7 @@ package com.medicheck.server.domain.hospital.service;
 
 import com.medicheck.server.domain.hospital.client.HiraClinicTop5Client;
 import com.medicheck.server.domain.hospital.client.dto.HiraClinicTop5Item;
+import com.medicheck.server.domain.hospital.dto.Top5BulkResult;
 import com.medicheck.server.domain.hospital.entity.Hospital;
 import com.medicheck.server.domain.hospital.entity.HospitalClinicTop5;
 import com.medicheck.server.domain.hospital.repository.HospitalClinicTop5Repository;
@@ -9,7 +10,9 @@ import com.medicheck.server.domain.hospital.repository.HospitalRepository;
 import com.medicheck.server.domain.hospital.repository.HospitalSpecification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -35,6 +38,50 @@ public class HospitalTop5SyncService {
     private final PlatformTransactionManager transactionManager;
 
     /**
+     * DB에 있는 병원을 id 순으로 순회하며 요양기호당 Top5 API를 1건씩 호출합니다.
+     *
+     * @param maxAttempts ykiho가 있는 병원에 대해 API 호출 최대 횟수 (양수 필수)
+     * @param pageSize    한 번에 읽는 병원 페이지 크기(내부 배치)
+     */
+    public Top5BulkResult syncAllByHospital(int maxAttempts, int pageSize) {
+        if (maxAttempts <= 0) {
+            throw new IllegalArgumentException("maxAttempts must be positive");
+        }
+        int effectivePageSize = pageSize > 0 ? pageSize : 100;
+        int attempted = 0;
+        int succeeded = 0;
+        int pageIndex = 0;
+        while (true) {
+            Page<Hospital> batch = hospitalRepository.findAll(
+                    PageRequest.of(pageIndex, effectivePageSize, Sort.by(Sort.Direction.ASC, "id")));
+            if (batch.isEmpty()) {
+                break;
+            }
+            for (Hospital h : batch) {
+                if (attempted >= maxAttempts) {
+                    log.info("병원진료정보 Top5 순회 중단(상한): attempted={}, succeeded={}, maxAttempts={}",
+                            attempted, succeeded, maxAttempts);
+                    return new Top5BulkResult(attempted, succeeded);
+                }
+                String ykiho = trim(h.getPublicCode(), 500);
+                if (ykiho == null || ykiho.isBlank()) {
+                    continue;
+                }
+                attempted++;
+                if (syncOneForHospital(h)) {
+                    succeeded++;
+                }
+            }
+            if (!batch.hasNext()) {
+                break;
+            }
+            pageIndex++;
+        }
+        log.info("병원진료정보 Top5 전체 순회 완료: attempted={}, succeeded={}", attempted, succeeded);
+        return new Top5BulkResult(attempted, succeeded);
+    }
+
+    /**
      * 주소(address) 포함 키워드(예: 구미)가 들어간 병원만 Top5를 1건씩 동기화한다.
      */
     public int syncByAddressKeyword(String addressKeyword, Integer maxSynced) {
@@ -51,9 +98,7 @@ public class HospitalTop5SyncService {
 
         int count = 0;
         for (Hospital h : hospitals) {
-            String ykiho = trim(h.getPublicCode(), 500);
-            if (ykiho == null || ykiho.isBlank()) continue;
-            if (syncOne(ykiho)) {
+            if (syncOneForHospital(h)) {
                 count++;
             }
         }
@@ -80,7 +125,17 @@ public class HospitalTop5SyncService {
             log.info("Top5 1건 동기화 스킵: DB 병원 미존재 ykiho={}", normalized);
             return false;
         }
-        Hospital hospital = hospitalOpt.get();
+        return syncOneForHospital(hospitalOpt.get());
+    }
+
+    /**
+     * 이미 DB에 로드된 {@link Hospital}에 대해서만 Top5를 조회·저장합니다(DB 재조회 없음).
+     */
+    public boolean syncOneForHospital(Hospital hospital) {
+        String normalized = trim(hospital.getPublicCode(), 500);
+        if (normalized == null || normalized.isBlank()) {
+            return false;
+        }
 
         HiraClinicTop5Item item = clinicTop5Client.getClinicTop5List1(
                 normalized, DEFAULT_PAGE_NO, DEFAULT_NUM_OF_ROWS
