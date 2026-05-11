@@ -34,6 +34,10 @@ app:
     expiration-ms: 86400000  # 24h
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+  hira:
+    sync-full:
+      # POST /sync/full 에서 maxTop5Attempts 미지정 시 적용되는 Top5 API 호출 상한(요양기호당 1회)
+      default-max-top5-attempts: ${HIRA_SYNC_FULL_DEFAULT_MAX_TOP5:5000}
 
 # 동기화 API 호출 시 필요한 관리자 키 (헤더 X-Admin-Key 와 일치해야 함).
 # 로컬: 기본값 사용. 운영: 반드시 환경변수 ADMIN_SYNC_KEY 로 덮어써야 함.

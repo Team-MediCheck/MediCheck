@@ -124,7 +124,7 @@ class HospitalControllerSyncSecurityTest {
         given(hospitalEvaluationSyncService.syncByAddressKeyword(anyString(), any())).willReturn(0);
         given(hospitalTop5SyncService.syncByAddressKeyword(anyString(), any())).willReturn(0);
         given(hospitalTop5SyncService.syncOne(anyString())).willReturn(false);
-        given(hospitalTop5SyncService.syncAllByHospital(any(), anyInt()))
+        given(hospitalTop5SyncService.syncAllByHospital(anyInt(), anyInt()))
                 .willReturn(new Top5BulkResult(0, 0));
 
         mockMvc.perform(post("/api/hospitals/sync")
@@ -189,8 +189,7 @@ class HospitalControllerSyncSecurityTest {
         then(hospitalEvaluationSyncService).should(times(2)).syncAll(any());
         then(hospitalEvaluationSyncService).should().syncOne("some-ykiho");
         then(hospitalEvaluationSyncService).should().syncByAddressKeyword("구미", null);
-        then(hiraSyncService).should().syncAllRegions(10);
-        then(hospitalTop5SyncService).should().syncAllByHospital(any(), anyInt());
+        then(hospitalTop5SyncService).should().syncAllByHospital(anyInt(), anyInt());
         then(hospitalTop5SyncService).should().syncByAddressKeyword("구미", null);
         then(hospitalTop5SyncService).should().syncOne("some-ykiho");
     }

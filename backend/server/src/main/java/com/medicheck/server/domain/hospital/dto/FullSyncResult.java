@@ -21,5 +21,8 @@ public class FullSyncResult {
     /** Top5 저장·갱신에 성공한 병원 수 */
     private final int top5HospitalsSucceeded;
 
+    /** 이번 요청에 적용된 Top5 API 호출 상한(요양기호 1건 = 1회) */
+    private final int top5MaxAttemptsApplied;
+
     private final String message;
 }

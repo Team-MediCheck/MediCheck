@@ -39,12 +39,14 @@ public class HospitalTop5SyncService {
 
     /**
      * DB에 있는 병원을 id 순으로 순회하며 요양기호당 Top5 API를 1건씩 호출합니다.
-     * 병원 수만큼 외부 API가 호출되므로 시간·트래픽이 매우 큽니다.
      *
-     * @param maxAttempts ykiho가 있는 병원에 대해 API 호출 횟수 상한 (null 또는 0 이하면 제한 없음)
+     * @param maxAttempts ykiho가 있는 병원에 대해 API 호출 최대 횟수 (양수 필수)
      * @param pageSize    한 번에 읽는 병원 페이지 크기(내부 배치)
      */
-    public Top5BulkResult syncAllByHospital(Integer maxAttempts, int pageSize) {
+    public Top5BulkResult syncAllByHospital(int maxAttempts, int pageSize) {
+        if (maxAttempts <= 0) {
+            throw new IllegalArgumentException("maxAttempts must be positive");
+        }
         int effectivePageSize = pageSize > 0 ? pageSize : 100;
         int attempted = 0;
         int succeeded = 0;
@@ -56,7 +58,7 @@ public class HospitalTop5SyncService {
                 break;
             }
             for (Hospital h : batch) {
-                if (maxAttempts != null && maxAttempts > 0 && attempted >= maxAttempts) {
+                if (attempted >= maxAttempts) {
                     log.info("병원진료정보 Top5 순회 중단(상한): attempted={}, succeeded={}, maxAttempts={}",
                             attempted, succeeded, maxAttempts);
                     return new Top5BulkResult(attempted, succeeded);
@@ -66,7 +68,7 @@ public class HospitalTop5SyncService {
                     continue;
                 }
                 attempted++;
-                if (syncOne(ykiho)) {
+                if (syncOneForHospital(h)) {
                     succeeded++;
                 }
             }
@@ -96,9 +98,7 @@ public class HospitalTop5SyncService {
 
         int count = 0;
         for (Hospital h : hospitals) {
-            String ykiho = trim(h.getPublicCode(), 500);
-            if (ykiho == null || ykiho.isBlank()) continue;
-            if (syncOne(ykiho)) {
+            if (syncOneForHospital(h)) {
                 count++;
             }
         }
@@ -125,7 +125,17 @@ public class HospitalTop5SyncService {
             log.info("Top5 1건 동기화 스킵: DB 병원 미존재 ykiho={}", normalized);
             return false;
         }
-        Hospital hospital = hospitalOpt.get();
+        return syncOneForHospital(hospitalOpt.get());
+    }
+
+    /**
+     * 이미 DB에 로드된 {@link Hospital}에 대해서만 Top5를 조회·저장합니다(DB 재조회 없음).
+     */
+    public boolean syncOneForHospital(Hospital hospital) {
+        String normalized = trim(hospital.getPublicCode(), 500);
+        if (normalized == null || normalized.isBlank()) {
+            return false;
+        }
 
         HiraClinicTop5Item item = clinicTop5Client.getClinicTop5List1(
                 normalized, DEFAULT_PAGE_NO, DEFAULT_NUM_OF_ROWS

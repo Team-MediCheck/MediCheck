@@ -1,6 +1,7 @@
 package com.medicheck.server.domain.hospital.controller;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import com.medicheck.server.domain.hospital.dto.HospitalResponse;
 import com.medicheck.server.domain.hospital.dto.NearbyHospitalResponse;
 import com.medicheck.server.domain.hospital.dto.FullSyncResult;
@@ -52,6 +53,10 @@ public class HospitalController {
     private final HiraSyncService hiraSyncService;
     private final HospitalEvaluationSyncService hospitalEvaluationSyncService;
     private final HospitalTop5SyncService hospitalTop5SyncService;
+
+    /** sync/full 에서 Top5 호출 무제한을 막기 위한 기본 상한(application.yaml → app.hira.sync-full.default-max-top5-attempts) */
+    @Value("${app.hira.sync-full.default-max-top5-attempts:5000}")
+    private int syncFullDefaultMaxTop5Attempts;
 
     /**
      * 병원 상세 조회.
@@ -274,12 +279,13 @@ public class HospitalController {
      * 전국 병원 기본정보 → 평가 → Top5 를 순서대로 한 요청에서 실행합니다.
      * Top5는 DB 병원마다 API 1회 호출로 매우 오래 걸릴 수 있습니다.
      *
-     * POST /api/hospitals/sync/full?numOfRows=500 (선택: maxEvalSynced, maxTop5Attempts, top5PageSize)
+     * POST /api/hospitals/sync/full?numOfRows=500 (선택: maxEvalSynced, maxTop5Attempts, top5PageSize).
+     * Top5 호출 상한을 생략하면 app.hira.sync-full.default-max-top5-attempts(기본 5000)가 적용됩니다.
      */
     @Operation(
             summary = "HIRA 통합 동기화(전국 병원·평가·Top5)",
-            description = "관리자 키 필요. (1) sync/all 과 동일 전국 병원 기본정보 (2) 평가 전체 (3) 요양기호가 있는 모든 병원에 대해 Top5 호출. "
-                    + "maxTop5Attempts 로 Top5 호출 상한을 두지 않으면 병원 수만큼 외부 API가 호출됩니다."
+            description = "관리자 키 필요. (1) 전국 병원 기본정보 (2) 평가 전체 (3) Top5 순회. "
+                    + "Top5는 무제한 호출을 막기 위해 기본값으로 건당 상한이 적용되며(maxTop5Attempts 생략 시 설정값), 더 필요하면 큰 값으로 재호출하세요."
     )
     @PostMapping("/sync/full")
     public ResponseEntity<?> syncFullPipeline(
@@ -289,14 +295,18 @@ public class HospitalController {
             @RequestParam(defaultValue = "100") int top5PageSize
     ) {
         try {
+            int defaultCap = syncFullDefaultMaxTop5Attempts > 0 ? syncFullDefaultMaxTop5Attempts : 5000;
+            int top5Cap = (maxTop5Attempts != null && maxTop5Attempts > 0) ? maxTop5Attempts : defaultCap;
+
             SyncResult hospitals = hiraSyncService.syncAllRegions(numOfRows);
             int evaluationsSynced = hospitalEvaluationSyncService.syncAll(maxEvalSynced);
-            var top5 = hospitalTop5SyncService.syncAllByHospital(maxTop5Attempts, top5PageSize);
+            var top5 = hospitalTop5SyncService.syncAllByHospital(top5Cap, top5PageSize);
             FullSyncResult body = FullSyncResult.builder()
                     .hospitals(hospitals)
                     .evaluationsSynced(evaluationsSynced)
                     .top5HospitalsAttempted(top5.hospitalsAttempted())
                     .top5HospitalsSucceeded(top5.hospitalsSucceeded())
+                    .top5MaxAttemptsApplied(top5Cap)
                     .message("전국 병원·평가·Top5 동기화 완료")
                     .build();
             return ResponseEntity.ok(body);
