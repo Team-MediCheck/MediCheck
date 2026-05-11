@@ -80,6 +80,7 @@ public class SecurityConfig {
                                 "/api/hospitals/sync/evaluations",
                                 "/api/hospitals/sync/evaluations/one",
                                 "/api/hospitals/sync/evaluations/region",
+                                "/api/hospitals/sync/top5/all",
                                 "/api/hospitals/sync/top5/one",
                                 "/api/hospitals/sync/top5/region")
                         .hasRole("ADMIN")

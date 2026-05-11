@@ -11,10 +11,7 @@ try {
   require('dotenv').config({ quiet: true })
 } catch (_) {}
 
-const nativeKakaoAppKey =
-  process.env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY ||
-  process.env.EXPO_PUBLIC_KAKAO_REST_API_KEY ||
-  ''
+const nativeKakaoAppKey = process.env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY || ''
 const basePlugins = [
   'expo-router',
   [

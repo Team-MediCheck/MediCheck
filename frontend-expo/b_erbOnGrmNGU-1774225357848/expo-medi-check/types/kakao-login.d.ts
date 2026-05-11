@@ -12,4 +12,5 @@ declare module '@react-native-seoul/kakao-login' {
   }
 
   export function login(): Promise<KakaoOAuthToken>
+  export function loginWithKakaoAccount(): Promise<KakaoOAuthToken>
 }
