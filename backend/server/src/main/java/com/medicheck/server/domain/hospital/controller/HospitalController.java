@@ -3,6 +3,7 @@ package com.medicheck.server.domain.hospital.controller;
 import lombok.extern.slf4j.Slf4j;
 import com.medicheck.server.domain.hospital.dto.HospitalResponse;
 import com.medicheck.server.domain.hospital.dto.NearbyHospitalResponse;
+import com.medicheck.server.domain.hospital.dto.FullSyncResult;
 import com.medicheck.server.domain.hospital.dto.SyncResult;
 import com.medicheck.server.domain.hospital.service.HiraSyncService;
 import com.medicheck.server.domain.hospital.service.HospitalEvaluationSyncService;
@@ -263,6 +264,47 @@ public class HospitalController {
             log.error("HIRA 전국 동기화 실패 errorId={}", errorId, e);
             return ResponseEntity.status(500).body(Map.of(
                     "error", "sync-all failed",
+                    "message", "internal server error",
+                    "errorId", errorId
+            ));
+        }
+    }
+
+    /**
+     * 전국 병원 기본정보 → 평가 → Top5 를 순서대로 한 요청에서 실행합니다.
+     * Top5는 DB 병원마다 API 1회 호출로 매우 오래 걸릴 수 있습니다.
+     *
+     * POST /api/hospitals/sync/full?numOfRows=500 (선택: maxEvalSynced, maxTop5Attempts, top5PageSize)
+     */
+    @Operation(
+            summary = "HIRA 통합 동기화(전국 병원·평가·Top5)",
+            description = "관리자 키 필요. (1) sync/all 과 동일 전국 병원 기본정보 (2) 평가 전체 (3) 요양기호가 있는 모든 병원에 대해 Top5 호출. "
+                    + "maxTop5Attempts 로 Top5 호출 상한을 두지 않으면 병원 수만큼 외부 API가 호출됩니다."
+    )
+    @PostMapping("/sync/full")
+    public ResponseEntity<?> syncFullPipeline(
+            @RequestParam(defaultValue = "500") int numOfRows,
+            @RequestParam(required = false) Integer maxEvalSynced,
+            @RequestParam(required = false) Integer maxTop5Attempts,
+            @RequestParam(defaultValue = "100") int top5PageSize
+    ) {
+        try {
+            SyncResult hospitals = hiraSyncService.syncAllRegions(numOfRows);
+            int evaluationsSynced = hospitalEvaluationSyncService.syncAll(maxEvalSynced);
+            var top5 = hospitalTop5SyncService.syncAllByHospital(maxTop5Attempts, top5PageSize);
+            FullSyncResult body = FullSyncResult.builder()
+                    .hospitals(hospitals)
+                    .evaluationsSynced(evaluationsSynced)
+                    .top5HospitalsAttempted(top5.hospitalsAttempted())
+                    .top5HospitalsSucceeded(top5.hospitalsSucceeded())
+                    .message("전국 병원·평가·Top5 동기화 완료")
+                    .build();
+            return ResponseEntity.ok(body);
+        } catch (Exception e) {
+            String errorId = java.util.UUID.randomUUID().toString();
+            log.error("HIRA 통합 동기화 실패 errorId={}", errorId, e);
+            return ResponseEntity.status(500).body(Map.of(
+                    "error", "sync-full failed",
                     "message", "internal server error",
                     "errorId", errorId
             ));

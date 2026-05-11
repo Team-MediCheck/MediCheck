@@ -2,6 +2,7 @@ package com.medicheck.server.domain.hospital.service;
 
 import com.medicheck.server.domain.hospital.client.HiraClinicTop5Client;
 import com.medicheck.server.domain.hospital.client.dto.HiraClinicTop5Item;
+import com.medicheck.server.domain.hospital.dto.Top5BulkResult;
 import com.medicheck.server.domain.hospital.entity.Hospital;
 import com.medicheck.server.domain.hospital.entity.HospitalClinicTop5;
 import com.medicheck.server.domain.hospital.repository.HospitalClinicTop5Repository;
@@ -9,7 +10,9 @@ import com.medicheck.server.domain.hospital.repository.HospitalRepository;
 import com.medicheck.server.domain.hospital.repository.HospitalSpecification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -33,6 +36,48 @@ public class HospitalTop5SyncService {
     private final HospitalRepository hospitalRepository;
     private final HospitalClinicTop5Repository top5Repository;
     private final PlatformTransactionManager transactionManager;
+
+    /**
+     * DB에 있는 병원을 id 순으로 순회하며 요양기호당 Top5 API를 1건씩 호출합니다.
+     * 병원 수만큼 외부 API가 호출되므로 시간·트래픽이 매우 큽니다.
+     *
+     * @param maxAttempts ykiho가 있는 병원에 대해 API 호출 횟수 상한 (null 또는 0 이하면 제한 없음)
+     * @param pageSize    한 번에 읽는 병원 페이지 크기(내부 배치)
+     */
+    public Top5BulkResult syncAllByHospital(Integer maxAttempts, int pageSize) {
+        int effectivePageSize = pageSize > 0 ? pageSize : 100;
+        int attempted = 0;
+        int succeeded = 0;
+        int pageIndex = 0;
+        while (true) {
+            Page<Hospital> batch = hospitalRepository.findAll(
+                    PageRequest.of(pageIndex, effectivePageSize, Sort.by(Sort.Direction.ASC, "id")));
+            if (batch.isEmpty()) {
+                break;
+            }
+            for (Hospital h : batch) {
+                if (maxAttempts != null && maxAttempts > 0 && attempted >= maxAttempts) {
+                    log.info("병원진료정보 Top5 순회 중단(상한): attempted={}, succeeded={}, maxAttempts={}",
+                            attempted, succeeded, maxAttempts);
+                    return new Top5BulkResult(attempted, succeeded);
+                }
+                String ykiho = trim(h.getPublicCode(), 500);
+                if (ykiho == null || ykiho.isBlank()) {
+                    continue;
+                }
+                attempted++;
+                if (syncOne(ykiho)) {
+                    succeeded++;
+                }
+            }
+            if (!batch.hasNext()) {
+                break;
+            }
+            pageIndex++;
+        }
+        log.info("병원진료정보 Top5 전체 순회 완료: attempted={}, succeeded={}", attempted, succeeded);
+        return new Top5BulkResult(attempted, succeeded);
+    }
 
     /**
      * 주소(address) 포함 키워드(예: 구미)가 들어간 병원만 Top5를 1건씩 동기화한다.
