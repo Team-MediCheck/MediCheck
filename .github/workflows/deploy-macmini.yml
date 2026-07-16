@@ -63,21 +63,28 @@ jobs:
       - name: Rebuild full stack
         run: |
           set -euo pipefail
-          # LaunchAgent에서는 Docker Desktop credsStore(keychain) 접근이 막히므로 제거
+          # LaunchAgent에서는 macOS keychain(credsStore=desktop) 접근이 막힘 → no-op helper 사용
+          HELPER="${HOME}/.local/bin/docker-credential-medicheck-noop"
+          mkdir -p "${HOME}/.local/bin"
+          printf '%s\n' \
+            '#!/bin/sh' \
+            'case "$1" in' \
+            '  get)  printf '\''%s\n'\'' '\''{"ServerURL":"","Username":"","Secret":""}'\'' ;;' \
+            '  list) printf '\''%s\n'\'' '\''{}'\'' ;;' \
+            '  store|erase) ;;' \
+            '  *) exit 0 ;;' \
+            'esac' > "$HELPER"
+          chmod +x "$HELPER"
           python3 - <<'PY'
           import json
           from pathlib import Path
           p = Path.home() / ".docker" / "config.json"
-          if not p.exists():
-              raise SystemExit(0)
-          cfg = json.loads(p.read_text())
-          if "credsStore" in cfg or "credHelpers" in cfg:
-              cfg.pop("credsStore", None)
-              cfg.pop("credHelpers", None)
-              p.write_text(json.dumps(cfg, indent="\t") + "\n")
-              print("removed docker credsStore for headless pulls")
-          else:
-              print("docker credsStore already absent")
+          cfg = json.loads(p.read_text()) if p.exists() else {}
+          cfg["credsStore"] = "medicheck-noop"
+          cfg.pop("credHelpers", None)
+          p.parent.mkdir(parents=True, exist_ok=True)
+          p.write_text(json.dumps(cfg, indent="\t") + "\n")
+          print("docker credsStore=medicheck-noop")
           PY
           cd "$DEPLOY_PATH"
           docker compose -f docker-compose.local.yml --env-file .env.local up -d --build --remove-orphans
