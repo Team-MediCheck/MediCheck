@@ -1,0 +1,83 @@
+# 맥미니(self-hosted)에서 docker-compose.local.yml 전체 스택을 재빌드·기동합니다.
+#
+# 사전 조건 (맥미니):
+# - GitHub Actions self-hosted runner 라벨: self-hosted, macOS, medicheck
+# - 배포 경로에 저장소 clone + .env.local, backend/server/.env.prod 존재
+# - Docker Desktop 실행 가능
+#
+# env 파일은 gitignore라 pull/reset 해도 유지됩니다.
+
+name: Deploy Mac Mini
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-macmini
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, macOS, medicheck]
+    timeout-minutes: 60
+    env:
+      DEPLOY_PATH: /Users/snowrabbit123/Desktop/Medicheck/MediCheck
+      PATH: /usr/local/bin:/opt/homebrew/bin:/Applications/Docker.app/Contents/Resources/bin:/Users/snowrabbit123/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+    steps:
+      - name: Wait for Docker
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 36); do
+            if docker info >/dev/null 2>&1; then
+              echo "Docker ready"
+              exit 0
+            fi
+            if [[ $i -eq 1 ]]; then
+              open -a Docker || true
+            fi
+            sleep 5
+          done
+          echo "::error::Docker engine not ready"
+          exit 1
+
+      - name: Sync repository
+        run: |
+          set -euo pipefail
+          cd "$DEPLOY_PATH"
+          test -d .git
+          git remote get-url origin
+          git fetch --prune origin main
+          git checkout main
+          git reset --hard origin/main
+          echo "HEAD=$(git rev-parse --short HEAD)"
+
+      - name: Verify env files
+        run: |
+          set -euo pipefail
+          cd "$DEPLOY_PATH"
+          test -f .env.local || { echo "::error::.env.local missing"; exit 1; }
+          test -f backend/server/.env.prod || { echo "::error::backend/server/.env.prod missing"; exit 1; }
+
+      - name: Rebuild full stack
+        run: |
+          set -euo pipefail
+          cd "$DEPLOY_PATH"
+          docker compose -f docker-compose.local.yml --env-file .env.local up -d --build --remove-orphans
+
+      - name: Health check
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://127.0.0.1:80/; then
+              echo "local :80 OK"
+              break
+            fi
+            sleep 2
+            if [[ $i -eq 30 ]]; then
+              echo "::error::local health check failed"
+              exit 1
+            fi
+          done
+          curl -fsS -o /dev/null -w "https:%{http_code}\n" https://medicheck.life/ || true

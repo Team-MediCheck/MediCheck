@@ -1,0 +1,8 @@
+{
+	auto_https off
+}
+
+http://medicheck.life, http://www.medicheck.life {
+	encode gzip
+	reverse_proxy frontend:8080
+}

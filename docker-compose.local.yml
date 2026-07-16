@@ -1,0 +1,75 @@
+services:
+  mysql:
+    container_name: medicheck-mysql
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: medi_check
+      MYSQL_USER: medicheck
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-medicheck}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-medicheckroot}
+    volumes:
+      - medicheck_mysql_data:/var/lib/mysql
+      - ./scripts/mysql/init-schema.sql:/docker-entrypoint-initdb.d/01-init-schema.sql:ro
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-medicheckroot}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+
+  backend:
+    container_name: medicheck-backend
+    build:
+      context: ./backend/server
+      dockerfile: Dockerfile
+    env_file:
+      - ./backend/server/.env.prod
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/medi_check?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+      SPRING_DATASOURCE_USERNAME: medicheck
+      DB_PASSWORD: ${MYSQL_PASSWORD:-medicheck}
+      # 로컬 init-schema로 테이블·CASCADE FK를 이미 만듦. V1(DELIMITER 프로시저)은 건너뛴다.
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
+      SPRING_FLYWAY_BASELINE_VERSION: "1"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    container_name: medicheck-frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_KAKAO_APP_KEY: ${VITE_KAKAO_APP_KEY:-}
+        VITE_KAKAO_OAUTH_REDIRECT_ORIGIN: ${VITE_KAKAO_OAUTH_REDIRECT_ORIGIN:-https://medicheck.life}
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    # LAN/직접 접속용. 외부 HTTP는 caddy(80) 사용
+    ports:
+      - "${FRONTEND_PORT:-8080}:8080"
+
+  caddy:
+    container_name: medicheck-caddy
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+
+volumes:
+  medicheck_mysql_data:
+  caddy_data:
+  caddy_config:
