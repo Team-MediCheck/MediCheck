@@ -61,8 +61,14 @@ jobs:
           test -f backend/server/.env.prod || { echo "::error::backend/server/.env.prod missing"; exit 1; }
 
       - name: Rebuild full stack
+        env:
+          # LaunchAgent 세션에서는 Docker Desktop credsStore(keychain) 접근이 막힘
+          DOCKER_CONFIG: /Users/snowrabbit123/Library/Application Support/MediCheck/docker-ci
         run: |
           set -euo pipefail
+          mkdir -p "$DOCKER_CONFIG"
+          # public image pull만 하므로 keychain credsStore 비활성화
+          printf '%s\n' '{' '  "auths": {},' '  "currentContext": "desktop-linux"' '}' > "$DOCKER_CONFIG/config.json"
           cd "$DEPLOY_PATH"
           docker compose -f docker-compose.local.yml --env-file .env.local up -d --build --remove-orphans
 
