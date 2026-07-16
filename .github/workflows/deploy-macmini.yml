@@ -61,14 +61,24 @@ jobs:
           test -f backend/server/.env.prod || { echo "::error::backend/server/.env.prod missing"; exit 1; }
 
       - name: Rebuild full stack
-        env:
-          # LaunchAgent 세션에서는 Docker Desktop credsStore(keychain) 접근이 막힘
-          DOCKER_CONFIG: /Users/snowrabbit123/Library/Application Support/MediCheck/docker-ci
         run: |
           set -euo pipefail
-          mkdir -p "$DOCKER_CONFIG"
-          # public image pull만 하므로 keychain credsStore 비활성화
-          printf '%s\n' '{' '  "auths": {},' '  "currentContext": "desktop-linux"' '}' > "$DOCKER_CONFIG/config.json"
+          # LaunchAgent에서는 Docker Desktop credsStore(keychain) 접근이 막히므로 제거
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path.home() / ".docker" / "config.json"
+          if not p.exists():
+              raise SystemExit(0)
+          cfg = json.loads(p.read_text())
+          if "credsStore" in cfg or "credHelpers" in cfg:
+              cfg.pop("credsStore", None)
+              cfg.pop("credHelpers", None)
+              p.write_text(json.dumps(cfg, indent="\t") + "\n")
+              print("removed docker credsStore for headless pulls")
+          else:
+              print("docker credsStore already absent")
+          PY
           cd "$DEPLOY_PATH"
           docker compose -f docker-compose.local.yml --env-file .env.local up -d --build --remove-orphans
 
