@@ -2,6 +2,7 @@ package com.medicheck.server.domain.hospital.service;
 
 import com.medicheck.server.domain.hospital.client.HiraClinicTop5Client;
 import com.medicheck.server.domain.hospital.client.dto.HiraClinicTop5Item;
+import com.medicheck.server.domain.hospital.dto.RegionSyncResult;
 import com.medicheck.server.domain.hospital.dto.Top5BulkResult;
 import com.medicheck.server.domain.hospital.entity.Hospital;
 import com.medicheck.server.domain.hospital.entity.HospitalClinicTop5;
@@ -84,27 +85,38 @@ public class HospitalTop5SyncService {
     /**
      * 주소(address) 포함 키워드(예: 구미)가 들어간 병원만 Top5를 1건씩 동기화한다.
      */
-    public int syncByAddressKeyword(String addressKeyword, Integer maxSynced) {
-        if (addressKeyword == null || addressKeyword.isBlank()) return 0;
-
-        Specification<Hospital> spec = HospitalSpecification.addressContains(addressKeyword);
-        List<Hospital> hospitals;
-        if (maxSynced != null && maxSynced > 0) {
-            // maxSynced가 지정되면 성공 건수 기준이 아니라 후보 조회 수 자체를 제한해 요청 시간을 예측 가능하게 만든다.
-            hospitals = hospitalRepository.findAll(spec, PageRequest.of(0, maxSynced)).getContent();
-        } else {
-            hospitals = hospitalRepository.findAll(spec);
+    public RegionSyncResult syncByAddressKeyword(String addressKeyword, Integer maxSynced) {
+        if (addressKeyword == null || addressKeyword.isBlank()) {
+            return new RegionSyncResult(0, 0, 0, true);
         }
 
-        int count = 0;
+        Specification<Hospital> spec = HospitalSpecification.addressContains(addressKeyword);
+        List<Hospital> hospitals = hospitalRepository.findAll(spec);
+
+        int attempted = 0;
+        int succeeded = 0;
+        int skipped = 0;
+        boolean hitLimit = false;
         for (Hospital h : hospitals) {
+            if (maxSynced != null && maxSynced > 0 && attempted >= maxSynced) {
+                hitLimit = true;
+                break;
+            }
+            String ykiho = trim(h.getPublicCode(), 500);
+            if (ykiho == null || ykiho.isBlank()) {
+                skipped++;
+                continue;
+            }
+            attempted++;
             if (syncOneForHospital(h)) {
-                count++;
+                succeeded++;
             }
         }
 
-        log.info("병원진료정보 Top5 지역 동기화 완료: addressKeyword={}, synced={}", addressKeyword, count);
-        return count;
+        boolean complete = !hitLimit;
+        log.info("병원진료정보 Top5 지역 동기화 완료: addressKeyword={}, synced={}, attempted={}, skippedNoYkiho={}, complete={}",
+                addressKeyword, succeeded, attempted, skipped, complete);
+        return new RegionSyncResult(succeeded, attempted, skipped, complete);
     }
 
     /**

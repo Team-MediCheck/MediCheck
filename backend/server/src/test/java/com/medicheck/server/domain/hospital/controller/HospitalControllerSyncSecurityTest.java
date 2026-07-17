@@ -1,6 +1,7 @@
 package com.medicheck.server.domain.hospital.controller;
 
 import com.medicheck.server.domain.hospital.dto.SyncResult;
+import com.medicheck.server.domain.hospital.dto.RegionSyncResult;
 import com.medicheck.server.domain.hospital.dto.Top5BulkResult;
 import com.medicheck.server.global.config.DirectionsRateLimitProperties;
 import com.medicheck.server.global.auth.PerIPDirectionsRateLimitFilter;
@@ -124,8 +125,10 @@ class HospitalControllerSyncSecurityTest {
                 .willReturn(SyncResult.builder().keyConfigured(true).fetchedCount(0).saved(0).build());
         given(hospitalEvaluationSyncService.syncAll(any())).willReturn(0);
         given(hospitalEvaluationSyncService.syncOne(anyString())).willReturn(true);
-        given(hospitalEvaluationSyncService.syncByAddressKeyword(anyString(), any())).willReturn(0);
-        given(hospitalTop5SyncService.syncByAddressKeyword(anyString(), any())).willReturn(0);
+        given(hospitalEvaluationSyncService.syncByAddressKeyword(anyString(), any()))
+                .willReturn(new RegionSyncResult(0, 0, 0, true));
+        given(hospitalTop5SyncService.syncByAddressKeyword(anyString(), any()))
+                .willReturn(new RegionSyncResult(0, 0, 0, true));
         given(hospitalTop5SyncService.syncOne(anyString())).willReturn(false);
         given(hospitalTop5SyncService.syncAllByHospital(anyInt(), anyInt()))
                 .willReturn(new Top5BulkResult(0, 0));

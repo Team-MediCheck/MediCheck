@@ -394,6 +394,7 @@ public class HospitalController {
      * X-Admin-Key 헤더 필요.
      * POST /api/hospitals/sync/evaluations/region?addressKeyword=구미
      * POST /api/hospitals/sync/evaluations/region?addressKeyword=구미&maxSynced=100
+     * maxSynced: 최대 HIRA API 호출 횟수(일일 한도 예산). null이면 제한 없음.
      */
     @Operation(summary = "심평원 평가 지역 동기화", description = "관리자 키 필요. 주소에 addressKeyword(예: 구미)가 포함된 병원만 평가를 1건씩 동기화합니다.")
     @PostMapping("/sync/evaluations/region")
@@ -408,11 +409,16 @@ public class HospitalController {
             ));
         }
         try {
-            int count = hospitalEvaluationSyncService.syncByAddressKeyword(addressKeyword.trim(), maxSynced);
+            var result = hospitalEvaluationSyncService.syncByAddressKeyword(addressKeyword.trim(), maxSynced);
             return ResponseEntity.ok(Map.of(
-                    "synced", count,
+                    "synced", result.synced(),
+                    "attempted", result.attempted(),
+                    "skippedExisting", result.skipped(),
+                    "complete", result.complete(),
                     "addressKeyword", addressKeyword.trim(),
-                    "message", "해당 지역 병원평가정보 동기화 완료"
+                    "message", result.complete()
+                            ? "해당 지역 병원평가정보 동기화 완료"
+                            : "일일 예산 상한으로 부분 동기화 (내일 이어서 진행)"
             ));
         } catch (Exception e) {
             String errorId = java.util.UUID.randomUUID().toString();
@@ -460,6 +466,7 @@ public class HospitalController {
      * X-Admin-Key 헤더 필요.
      * POST /api/hospitals/sync/top5/region?addressKeyword=구미
      * POST /api/hospitals/sync/top5/region?addressKeyword=구미&maxSynced=100
+     * maxSynced: 최대 HIRA API 호출 횟수(일일 한도 예산). null이면 제한 없음.
      */
     @Operation(summary = "심평원 진료 Top5 지역 동기화", description = "관리자 키 필요. 주소에 addressKeyword(예: 구미)가 포함된 병원만 Top5(진료량 상위 5 질병) 1건씩 동기화합니다.")
     @PostMapping("/sync/top5/region")
@@ -474,11 +481,16 @@ public class HospitalController {
             ));
         }
         try {
-            int count = hospitalTop5SyncService.syncByAddressKeyword(addressKeyword.trim(), maxSynced);
+            var result = hospitalTop5SyncService.syncByAddressKeyword(addressKeyword.trim(), maxSynced);
             return ResponseEntity.ok(Map.of(
-                    "synced", count,
+                    "synced", result.synced(),
+                    "attempted", result.attempted(),
+                    "skippedNoYkiho", result.skipped(),
+                    "complete", result.complete(),
                     "addressKeyword", addressKeyword.trim(),
-                    "message", "해당 지역 진료 Top5 동기화 완료"
+                    "message", result.complete()
+                            ? "해당 지역 진료 Top5 동기화 완료"
+                            : "일일 예산 상한으로 부분 동기화 (내일 이어서 진행)"
             ));
         } catch (Exception e) {
             String errorId = java.util.UUID.randomUUID().toString();
