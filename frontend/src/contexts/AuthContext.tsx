@@ -26,7 +26,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(null)
     setUser(null)
     // 즐겨찾기 캐시 등 사용자별 데이터 초기화
-    queryClient.removeQueries({ queryKey: ['favoriteHospitals'] })
+    queryClient.removeQueries({ queryKey: ['favorites'] })
   }, [queryClient])
 
   const login = useCallback((newToken: string) => {

@@ -19,6 +19,7 @@ interface HospitalListItemProps {
   onClick?: () => void
   isFavorite?: boolean
   onToggleFavorite?: () => void
+  showDistance?: boolean
 }
 
 export function HospitalListItem({
@@ -26,6 +27,7 @@ export function HospitalListItem({
   onClick,
   isFavorite,
   onToggleFavorite,
+  showDistance = true,
 }: HospitalListItemProps) {
   const h = item.hospital
   const hasEvaluation = !!h.evaluation
@@ -75,7 +77,7 @@ export function HospitalListItem({
           )}
         </span>
         <span className="text-sky-600 font-medium flex-shrink-0">
-          {formatDistance(item.distanceMeters)}
+          {showDistance && item.distanceMeters > 0 ? formatDistance(item.distanceMeters) : null}
         </span>
       </div>
       {(h.averageRating != null && (h.reviewCount ?? 0) > 0) && (

@@ -277,9 +277,11 @@ export const HospitalMap = forwardRef<HospitalMapHandle, HospitalMapProps>(
       if (!selectedHospital) clearSelectedLabel()
     }, [selectedHospital])
 
+    // Absolute fill + overflow clip: Kakao tiles often paint with negative offsets
+    // and must never spill hit-targets into the sidebar region.
     return (
-      <div className="relative w-full h-full min-h-[400px]">
-        <div ref={containerRef} className="w-full h-full min-h-[400px]" />
+      <div className="absolute inset-0 overflow-hidden isolate contain-strict">
+        <div ref={containerRef} className="h-full w-full overflow-hidden" />
       </div>
     )
   }

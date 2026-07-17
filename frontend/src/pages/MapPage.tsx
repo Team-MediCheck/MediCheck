@@ -1,19 +1,15 @@
 import { useCallback, useMemo, useRef, useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import {
-  fetchNearbyHospitals,
-  fetchFavoriteHospitals,
-  addFavoriteHospital,
-  removeFavoriteHospital,
-} from '../api/hospitals'
+import { fetchNearbyHospitals } from '../api/hospitals'
 import { HospitalMap, type HospitalMapHandle } from '../components/HospitalMap'
 import { HospitalBottomSheet } from '../components/HospitalBottomSheet'
 import { HospitalListItem } from '../components/HospitalListItem'
 import { HospitalReviewModal } from '../components/HospitalReviewModal'
+import { useFavorites } from '../hooks/useFavorites'
 import { useGeolocation } from '../hooks/useGeolocation'
 import { useKakaoMapScript } from '../hooks/useKakaoMapScript'
+import { filterNearbyHospitals } from '../lib/hospitalFilters'
 import type { NearbyHospital } from '../types/hospital'
-import { useAuth } from '../contexts/AuthContext'
 
 const RADIUS_OPTIONS = [
   { value: 1000, label: '1km' },
@@ -24,30 +20,6 @@ const RADIUS_OPTIONS = [
   { value: 50000, label: '거리 제한 없음' },
 ]
 
-function filterHospitals(
-  items: NearbyHospital[],
-  keyword: string,
-  department: string
-): NearbyHospital[] {
-  let result = items
-  if (keyword.trim()) {
-    const k = keyword.trim().toLowerCase()
-    result = result.filter(
-      (i) =>
-        i.hospital.name.toLowerCase().includes(k) ||
-        (i.hospital.address?.toLowerCase().includes(k) ?? false) ||
-        (i.hospital.department?.toLowerCase().includes(k) ?? false)
-    )
-  }
-  if (department) {
-    result = result.filter(
-      (i) => i.hospital.department?.toLowerCase().includes(department.toLowerCase()) ?? false
-    )
-  }
-  // 정렬은 백엔드(거리 순) 결과를 그대로 사용
-  return result
-}
-
 export function MapPage() {
   const [radius, setRadius] = useState(3000)
   const [isListOpen, setIsListOpen] = useState(
@@ -56,8 +28,7 @@ export function MapPage() {
   const [searchKeyword, setSearchKeyword] = useState('')
   const [departmentFilter, setDepartmentFilter] = useState('')
   const mapRef = useRef<HospitalMapHandle>(null)
-  const { token } = useAuth()
-  const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set())
+  const { favoriteIds, toggleFavorite, isLoggedIn } = useFavorites()
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
   const [reviewHospitalId, setReviewHospitalId] = useState<number | null>(null)
   const [selectedHospital, setSelectedHospital] = useState<NearbyHospital | null>(null)
@@ -86,26 +57,21 @@ export function MapPage() {
   })
 
   useEffect(() => {
-    if (!token) {
-      setFavoriteIds(new Set())
+    if (!isLoggedIn) {
       setShowFavoritesOnly(false)
-      return
     }
-    let cancelled = false
-    ;(async () => {
-      try {
-        const favorites = await fetchFavoriteHospitals(token)
-        if (cancelled) return
-        setFavoriteIds(new Set(favorites.map((h) => h.id)))
-      } catch {
-        // 즐겨찾기 실패는 조용히 무시
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [token])
+  }, [isLoggedIn])
 
+  const handleToggleFavorite = useCallback(
+    async (hospitalId: number) => {
+      try {
+        await toggleFavorite(hospitalId)
+      } catch (err) {
+        alert(err instanceof Error ? err.message : '즐겨찾기 처리 중 오류가 발생했습니다.')
+      }
+    },
+    [toggleFavorite]
+  )
 
   const departments = useMemo(() => {
     const set = new Set<string>()
@@ -116,7 +82,7 @@ export function MapPage() {
   }, [hospitals])
 
   const filteredHospitals = useMemo(
-    () => filterHospitals(hospitals, searchKeyword, departmentFilter),
+    () => filterNearbyHospitals(hospitals, searchKeyword, departmentFilter),
     [hospitals, searchKeyword, departmentFilter]
   )
 
@@ -293,13 +259,13 @@ export function MapPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => token && setShowFavoritesOnly(true)}
-                  disabled={!token}
+                  onClick={() => isLoggedIn && setShowFavoritesOnly(true)}
+                  disabled={!isLoggedIn}
                   className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium border ${
                     showFavoritesOnly
                       ? 'bg-sky-500 text-white border-sky-500'
                       : 'bg-white text-gray-600 border-gray-200'
-                  } ${!token ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  } ${!isLoggedIn ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   즐겨찾기만 보기
                 </button>
@@ -339,32 +305,7 @@ export function MapPage() {
                   onClick={() => mapRef.current?.showHospitalPopup(item)}
                   isFavorite={favoriteIds.has(item.hospital.id)}
                   onToggleFavorite={
-                    token
-                      ? async () => {
-                          const id = item.hospital.id
-                          const prev = new Set(favoriteIds)
-                          const next = new Set(prev)
-                          const isAdding = !next.has(id)
-                          if (isAdding) next.add(id)
-                          else next.delete(id)
-                          setFavoriteIds(next)
-                          try {
-                            if (isAdding) {
-                              await addFavoriteHospital(token, id)
-                            } else {
-                              await removeFavoriteHospital(token, id)
-                            }
-                          } catch (err) {
-                            // 롤백
-                            setFavoriteIds(prev)
-                            alert(
-                              err instanceof Error
-                                ? err.message
-                                : '즐겨찾기 처리 중 오류가 발생했습니다.'
-                            )
-                          }
-                        }
-                      : undefined
+                    isLoggedIn ? () => handleToggleFavorite(item.hospital.id) : undefined
                   }
                 />
               ))
@@ -402,31 +343,7 @@ export function MapPage() {
             onOpenReviews={setReviewHospitalId}
             isFavorite={favoriteIds.has(selectedHospital.hospital.id)}
             onToggleFavorite={
-              token
-                ? async () => {
-                    const id = selectedHospital.hospital.id
-                    const prev = new Set(favoriteIds)
-                    const next = new Set(prev)
-                    const isAdding = !next.has(id)
-                    if (isAdding) next.add(id)
-                    else next.delete(id)
-                    setFavoriteIds(next)
-                    try {
-                      if (isAdding) {
-                        await addFavoriteHospital(token, id)
-                      } else {
-                        await removeFavoriteHospital(token, id)
-                      }
-                    } catch (err) {
-                      setFavoriteIds(prev)
-                      alert(
-                        err instanceof Error
-                          ? err.message
-                          : '즐겨찾기 처리 중 오류가 발생했습니다.'
-                      )
-                    }
-                  }
-                : undefined
+              isLoggedIn ? () => handleToggleFavorite(selectedHospital.hospital.id) : undefined
             }
           />
         )}

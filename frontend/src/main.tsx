@@ -16,7 +16,13 @@ const queryClient = new QueryClient({
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      {/*
+        RR v7 wraps location updates in startTransition by default.
+        Kakao map + geolocation keep scheduling higher-priority work, so tab
+        navigations update window.location but never flush React location —
+        UI stays on 즐겨찾기 while the URL shows /symptom. Opt out.
+      */}
+      <BrowserRouter unstable_useTransitions={false}>
         <App />
       </BrowserRouter>
     </QueryClientProvider>
