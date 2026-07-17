@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.medicheck.hira-sync-daily</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>/Users/snowrabbit123/Desktop/Medicheck/MediCheck/scripts/sync/launch-daily.sh</string>
+	</array>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key>
+		<integer>3</integer>
+		<key>Minute</key>
+		<integer>30</integer>
+	</dict>
+	<key>RunAtLoad</key>
+	<false/>
+	<key>StandardOutPath</key>
+	<string>/Users/snowrabbit123/Desktop/Medicheck/MediCheck/scripts/sync/state/launchd-hira-sync.out.log</string>
+	<key>StandardErrorPath</key>
+	<string>/Users/snowrabbit123/Desktop/Medicheck/MediCheck/scripts/sync/state/launchd-hira-sync.err.log</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>/usr/local/bin:/opt/homebrew/bin:/Applications/Docker.app/Contents/Resources/bin:/Users/snowrabbit123/.local/bin:/usr/bin:/bin</string>
+		<key>HOME</key>
+		<string>/Users/snowrabbit123</string>
+		<key>BASE_URL</key>
+		<string>http://127.0.0.1:8080</string>
+		<key>DAILY_BUDGET</key>
+		<string>9000</string>
+	</dict>
+</dict>
+</plist>
