@@ -1,6 +1,7 @@
 package com.medicheck.server.domain.hospital.service;
 
 import com.medicheck.server.domain.hospital.client.HiraEvaluationClient;
+import com.medicheck.server.domain.hospital.dto.RegionSyncResult;
 import com.medicheck.server.domain.hospital.client.dto.HiraAsmItem;
 import com.medicheck.server.domain.hospital.entity.Hospital;
 import com.medicheck.server.domain.hospital.entity.HospitalEvaluation;
@@ -11,7 +12,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
 import java.util.Map;
@@ -32,6 +35,7 @@ public class HospitalEvaluationSyncService {
     private final HiraEvaluationClient evaluationClient;
     private final HospitalRepository hospitalRepository;
     private final HospitalEvaluationRepository evaluationRepository;
+    private final PlatformTransactionManager transactionManager;
 
     /**
      * 전체 평가 데이터를 페이지 단위로 조회해, 우리 DB에 있는 병원(ykiho 매칭)만 저장/갱신합니다.
@@ -87,30 +91,52 @@ public class HospitalEvaluationSyncService {
     /**
      * 주소에 특정 키워드(예: "구미")가 포함된 병원만 골라 평가정보를 1건씩 동기화합니다.
      *
+     * <p>HIRA HTTP는 트랜잭션 밖에서 호출하고, DB 저장만 건별 커밋합니다.
+     *
      * @param addressKeyword 주소 포함 문자열 (예: "구미")
-     * @param maxSynced      최대 동기화 건수 (null 이하면 제한 없음)
-     * @return 저장/갱신된 평가 건수
+     * @param maxSynced      최대 API 호출 횟수 (null 이하면 제한 없음). 일일 한도 예산용.
+     * @return 동기화·호출 집계 결과
      */
-    @Transactional
-    public int syncByAddressKeyword(String addressKeyword, Integer maxSynced) {
+    public RegionSyncResult syncByAddressKeyword(String addressKeyword, Integer maxSynced) {
         if (addressKeyword == null || addressKeyword.isBlank()) {
-            return 0;
+            return new RegionSyncResult(0, 0, 0, true);
         }
         Specification<Hospital> spec = HospitalSpecification.addressContains(addressKeyword);
         List<Hospital> hospitals = hospitalRepository.findAll(spec);
+        TransactionTemplate tx = new TransactionTemplate(transactionManager);
         int count = 0;
+        int attempted = 0;
+        int skipped = 0;
+        boolean hitLimit = false;
         for (Hospital h : hospitals) {
-            if (maxSynced != null && maxSynced > 0 && count >= maxSynced) {
+            if (maxSynced != null && maxSynced > 0 && attempted >= maxSynced) {
+                hitLimit = true;
                 break;
             }
             String ykiho = trim(h.getPublicCode(), 500);
             if (ykiho == null || ykiho.isBlank()) continue;
-            if (syncOne(ykiho)) {
+            if (evaluationRepository.findByHospital_Id(h.getId()).isPresent()) {
+                skipped++;
+                continue;
+            }
+            attempted++;
+            List<HiraAsmItem> items = evaluationClient.getHospAsmInfo(1, 1, ykiho);
+            if (items == null || items.isEmpty()) {
+                continue;
+            }
+            Integer saved = tx.execute(status -> saveOrUpdateEvaluations(items, null));
+            if (saved != null && saved > 0) {
                 count++;
             }
+            if (attempted % 50 == 0) {
+                log.info("병원평가정보 지역 동기화 진행: addressKeyword={}, attempted={}, synced={}, skippedExisting={}",
+                        addressKeyword, attempted, count, skipped);
+            }
         }
-        log.info("병원평가정보 지역 동기화 완료: addressKeyword={}, {} 건 저장/갱신", addressKeyword, count);
-        return count;
+        boolean complete = !hitLimit;
+        log.info("병원평가정보 지역 동기화 완료: addressKeyword={}, {} 건 저장/갱신 (attempted={}, skippedExisting={}, complete={})",
+                addressKeyword, count, attempted, skipped, complete);
+        return new RegionSyncResult(count, attempted, skipped, complete);
     }
 
     /**

@@ -39,5 +39,9 @@ medi_check_dump.sql
 .env.test
 .env.aws
 !.env.aws.example
+!.env.local.example
 !backend/server/.env.example
 !backend/server/.env.prod.example
+
+# Local HIRA sync progress
+scripts/sync/state/
