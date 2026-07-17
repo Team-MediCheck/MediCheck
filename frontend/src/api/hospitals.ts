@@ -1,4 +1,4 @@
-import type { Hospital, NearbyHospital } from '../types/hospital'
+import type { Hospital, NearbyHospital, Page } from '../types/hospital'
 
 const API_BASE = '/api'
 
@@ -14,6 +14,29 @@ export async function fetchNearbyHospitals(
   })
   const res = await fetch(`${API_BASE}/hospitals/nearby?${params}`)
   if (!res.ok) throw new Error('근처 병원 조회 실패')
+  return res.json()
+}
+
+export async function fetchHospitalsBySymptom(params: {
+  symptom: string
+  lat?: number
+  lng?: number
+  page?: number
+  size?: number
+}): Promise<Page<Hospital>> {
+  const search = new URLSearchParams({ symptom: params.symptom })
+  if (params.lat != null) search.set('lat', String(params.lat))
+  if (params.lng != null) search.set('lng', String(params.lng))
+  if (params.page != null) search.set('page', String(params.page))
+  if (params.size != null) search.set('size', String(params.size))
+  const res = await fetch(`${API_BASE}/hospitals/search/symptom?${search}`)
+  if (!res.ok) throw new Error('증상별 병원 검색 실패')
+  return res.json()
+}
+
+export async function fetchSymptomPickerKeywords(): Promise<string[]> {
+  const res = await fetch(`${API_BASE}/hospitals/search/symptom-keywords`)
+  if (!res.ok) throw new Error('증상 키워드 조회 실패')
   return res.json()
 }
 

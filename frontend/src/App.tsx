@@ -1,16 +1,31 @@
-import { Link, Routes, Route, Navigate } from 'react-router-dom'
+import { Link, Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
-import { MapPage } from './pages/MapPage'
+import { AppLayout } from './components/AppLayout'
+import { MainPage } from './pages/MainPage'
 import { LoginPage } from './pages/LoginPage'
 import { SignupPage } from './pages/SignupPage'
 import { KakaoCallbackPage } from './pages/KakaoCallbackPage'
-import { FavoriteHospitalsPage } from './pages/FavoriteHospitalsPage'
+
+const MAIN_TABS = new Set(['search', 'symptom', 'favorites'])
+
+/**
+ * Single matched route for /search|/symptom|/favorites.
+ * Nested pathless layout + null Outlet was updating the browser URL without
+ * reliably re-rendering tab UI (stuck favorites login while href=/symptom).
+ */
+function MainTabPage() {
+  const { mainTab } = useParams()
+  if (!mainTab || !MAIN_TABS.has(mainTab)) {
+    return <Navigate to="/search" replace />
+  }
+  return <MainPage />
+}
 
 function Header() {
   const { user, logout, isLoading } = useAuth()
   return (
-    <header className="h-14 min-h-[44px] bg-white/95 backdrop-blur border-b border-gray-100 flex items-center justify-between px-4 sm:px-6 shadow-sm safe-area-pt">
-      <Link to="/" className="flex items-center gap-2 sm:gap-3 min-w-0">
+    <header className="shrink-0 h-14 min-h-[44px] z-40 bg-white/95 backdrop-blur border-b border-gray-100 flex items-center justify-between px-4 sm:px-6 shadow-sm safe-area-pt">
+      <Link to="/search" className="flex items-center gap-2 sm:gap-3 min-w-0">
         <div className="w-8 h-8 shrink-0 rounded-lg bg-gradient-to-br from-sky-500 to-cyan-600 flex items-center justify-center text-white">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5" aria-labelledby="app-logo-title">
             <title id="app-logo-title">MediCheck 로고</title>
@@ -54,42 +69,19 @@ function Header() {
   )
 }
 
-function RequireAuth({ children }: { children: React.ReactElement }) {
-  const { user, isLoading } = useAuth()
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <span className="text-sm text-gray-400">...</span>
-      </div>
-    )
-  }
-
-  if (!user) {
-    return <Navigate to="/login" replace />
-  }
-
-  return children
-}
-
 function AppContent() {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="h-dvh flex flex-col overflow-hidden bg-gray-50">
       <Header />
-      <main>
+      <main className="flex-1 min-h-0 overflow-y-auto">
         <Routes>
-          <Route path="/" element={<MapPage />} />
+          <Route element={<AppLayout />}>
+            <Route path="/" element={<Navigate to="/search" replace />} />
+            <Route path="/:mainTab" element={<MainTabPage />} />
+          </Route>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/oauth/kakao/callback" element={<KakaoCallbackPage />} />
-          <Route
-            path="/favorites"
-            element={
-              <RequireAuth>
-                <FavoriteHospitalsPage />
-              </RequireAuth>
-            }
-          />
         </Routes>
       </main>
     </div>
