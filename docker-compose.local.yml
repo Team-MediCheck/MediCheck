@@ -19,6 +19,12 @@ services:
       retries: 20
       start_period: 20s
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+        reservations:
+          memory: 512m
 
   backend:
     container_name: medicheck-backend
@@ -35,10 +41,18 @@ services:
       # 로컬 init-schema로 테이블·CASCADE FK를 이미 만듦. V1(DELIMITER 프로시저)은 건너뛴다.
       SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
       SPRING_FLYWAY_BASELINE_VERSION: "1"
+      # 컨테이너 mem limit(1.5g) 기준으로 힙을 맞춰 OOM을 줄임
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75"
     depends_on:
       mysql:
         condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1.5g
+        reservations:
+          memory: 768m
 
   frontend:
     container_name: medicheck-frontend
@@ -55,6 +69,12 @@ services:
     # LAN/직접 접속용. 외부 HTTP는 caddy(80) 사용
     ports:
       - "${FRONTEND_PORT:-8080}:8080"
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+        reservations:
+          memory: 64m
 
   caddy:
     container_name: medicheck-caddy
@@ -68,6 +88,12 @@ services:
       - caddy_config:/config
     depends_on:
       - frontend
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+        reservations:
+          memory: 64m
 
 volumes:
   medicheck_mysql_data:
