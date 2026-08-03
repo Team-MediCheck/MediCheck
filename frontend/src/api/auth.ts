@@ -48,3 +48,14 @@ export async function fetchMe(token: string): Promise<AuthUser | null> {
   if (!data || data.error) return null
   return data as AuthUser
 }
+
+/** 회원 탈퇴. 계정·즐겨찾기·리뷰 삭제. */
+export async function deleteAccount(token: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/auth/me`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (res.status === 204 || res.ok) return
+  const data = await res.json().catch(() => ({}))
+  throw new Error((data as { message?: string }).message ?? '계정 삭제에 실패했습니다.')
+}

@@ -61,6 +61,16 @@ public class AuthService {
     }
 
     /**
+     * 회원 탈퇴(하드 삭제). 즐겨찾기·리뷰는 DB ON DELETE CASCADE로 함께 제거됩니다.
+     */
+    @Transactional
+    public void deleteCurrentUser(String loginId) {
+        User user = userRepository.findByLoginId(loginId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+        userRepository.delete(user);
+    }
+
+    /**
      * 카카오 OAuth 인가 코드로 로그인 처리.
      * 외부 카카오 호출은 트랜잭션 밖에서 수행하고, 사용자 생성/조회만 트랜잭션 안에서 처리합니다.
      */

@@ -42,7 +42,7 @@ const plugins = [
 
 module.exports = {
   expo: {
-    name: 'MediCheck',
+    name: '바로닥터',
     owner: 'snowrabbit',
     slug: 'medi-check',
     version: '1.0.0',
@@ -52,12 +52,12 @@ module.exports = {
     splash: {
       image: './assets/splash.png',
       resizeMode: 'contain',
-      backgroundColor: '#0EA5E9',
+      backgroundColor: '#059669',
     },
     assetBundlePatterns: ['**/*'],
     ios: {
       supportsTablet: true,
-      bundleIdentifier: 'com.medicheck.app',
+      bundleIdentifier: 'life.medicheck.app',
       config: {
         usesNonExemptEncryption: false,
       },
@@ -68,9 +68,9 @@ module.exports = {
     android: {
       adaptiveIcon: {
         foregroundImage: './assets/adaptive-icon.png',
-        backgroundColor: '#0EA5E9',
+        backgroundColor: '#059669',
       },
-      package: 'com.medicheck.app',
+      package: 'life.medicheck.app',
       permissions: ['ACCESS_FINE_LOCATION', 'ACCESS_COARSE_LOCATION'],
     },
     /** expo-router / Linking — scheme 없으면 createURL 등에서 경고·크래시 가능 */

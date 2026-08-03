@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -240,6 +241,27 @@ public class AuthController {
             body.put("name", u.getName());
             body.put("userId", u.getId());
             return ResponseEntity.ok(body);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> err = new HashMap<>();
+            err.put("error", "unauthorized");
+            return ResponseEntity.status(401).body(err);
+        }
+    }
+
+    @Operation(
+            summary = "회원 탈퇴",
+            description = "로그인한 계정을 삭제합니다. 즐겨찾기·작성 리뷰도 함께 삭제됩니다. 복구할 수 없습니다."
+    )
+    @DeleteMapping("/me")
+    public ResponseEntity<?> deleteMe(Authentication auth) {
+        if (auth == null || !auth.isAuthenticated()) {
+            Map<String, Object> err = new HashMap<>();
+            err.put("error", "unauthorized");
+            return ResponseEntity.status(401).body(err);
+        }
+        try {
+            authService.deleteCurrentUser(auth.getName());
+            return ResponseEntity.noContent().build();
         } catch (IllegalArgumentException e) {
             Map<String, Object> err = new HashMap<>();
             err.put("error", "unauthorized");

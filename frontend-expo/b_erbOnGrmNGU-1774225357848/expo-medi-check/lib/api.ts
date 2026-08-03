@@ -288,6 +288,11 @@ export async function getMe(token: string): Promise<AuthUser | null> {
   }
 }
 
+/** 회원 탈퇴. 계정·즐겨찾기·리뷰 삭제. 204 */
+export async function deleteAccount(): Promise<void> {
+  await fetchApi<null>('/auth/me', { method: 'DELETE' })
+}
+
 // ─── 길찾기 API ────────────────────────────────────────────────────
 
 export async function getDirections(

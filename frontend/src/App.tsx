@@ -5,6 +5,8 @@ import { MainPage } from './pages/MainPage'
 import { LoginPage } from './pages/LoginPage'
 import { SignupPage } from './pages/SignupPage'
 import { KakaoCallbackPage } from './pages/KakaoCallbackPage'
+import { AccountDeletionPage } from './pages/AccountDeletionPage'
+import { PrivacyPage } from './pages/PrivacyPage'
 
 const MAIN_TABS = new Set(['search', 'symptom', 'favorites'])
 
@@ -26,15 +28,16 @@ function Header() {
   return (
     <header className="shrink-0 h-14 min-h-[44px] z-40 bg-white/95 backdrop-blur border-b border-gray-100 flex items-center justify-between px-4 sm:px-6 shadow-sm safe-area-pt">
       <Link to="/search" className="flex items-center gap-2 sm:gap-3 min-w-0">
-        <div className="w-8 h-8 shrink-0 rounded-lg bg-gradient-to-br from-sky-500 to-cyan-600 flex items-center justify-center text-white">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5" aria-labelledby="app-logo-title">
-            <title id="app-logo-title">MediCheck 로고</title>
-            <path d="M11 4v16h2V4h-2zm-7 7h16v2H4v-2z"/>
+        <div className="w-8 h-8 shrink-0 rounded-lg bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center text-white">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-[22px] h-[22px]" aria-labelledby="app-logo-title">
+            <title id="app-logo-title">바로닥터 로고</title>
+            {/* Hospital red-cross style: wide bars (~7u) on 24 viewBox */}
+            <path d="M8.5 2h7v6.5H22v7h-6.5V22h-7v-6.5H2v-7h6.5V2z" />
           </svg>
         </div>
-        <div className="min-w-0">
-          <h1 className="text-base sm:text-lg font-bold text-gray-800 truncate">MediCheck</h1>
-          <span className="hidden sm:inline text-xs text-gray-500">내 주변 안심 병원 찾기</span>
+        <div className="min-w-0 flex flex-col justify-center leading-tight">
+          <h1 className="text-base sm:text-lg font-bold leading-tight text-gray-800 truncate">바로닥터</h1>
+          <span className="hidden sm:block text-xs leading-tight text-gray-500">내 주변 안심 병원 찾기</span>
         </div>
       </Link>
       <nav className="flex items-center gap-2 sm:gap-3 min-w-0 shrink-0">
@@ -82,6 +85,8 @@ function AppContent() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/oauth/kakao/callback" element={<KakaoCallbackPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/account-deletion" element={<AccountDeletionPage />} />
         </Routes>
       </main>
     </div>

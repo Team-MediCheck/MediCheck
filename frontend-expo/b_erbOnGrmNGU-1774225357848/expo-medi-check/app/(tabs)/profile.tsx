@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router'
 import Constants from 'expo-constants'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuthStore } from '@/store/authStore'
+import { deleteAccount } from '@/lib/api'
 
 function profileInitial(name: string, loginId: string): string {
   const s = (name || loginId).trim()
@@ -28,6 +29,41 @@ export default function ProfileScreen() {
         },
       },
     ])
+  }
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      '회원 탈퇴',
+      '계정을 삭제하면 즐겨찾기와 작성한 리뷰가 함께 삭제되며 복구할 수 없습니다. 계속할까요?',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '탈퇴',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert('최종 확인', '정말로 계정을 삭제하시겠습니까?', [
+              { text: '취소', style: 'cancel' },
+              {
+                text: '계정 삭제',
+                style: 'destructive',
+                onPress: async () => {
+                  try {
+                    await deleteAccount()
+                    await logout()
+                    Alert.alert('탈퇴 완료', '계정이 삭제되었습니다.')
+                  } catch (e) {
+                    Alert.alert(
+                      '탈퇴 실패',
+                      e instanceof Error ? e.message : '계정 삭제에 실패했습니다.'
+                    )
+                  }
+                },
+              },
+            ])
+          },
+        },
+      ]
+    )
   }
 
   if (!user) {
@@ -85,9 +121,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.version}>
-          MediCheck v{appVersion}
-        </Text>
+        <Text style={styles.version}>바로닥터 v{appVersion}</Text>
       </View>
     )
   }
@@ -147,9 +181,13 @@ export default function ProfileScreen() {
           <Ionicons name="log-out-outline" size={24} color="#EF4444" />
           <Text style={[styles.menuText, styles.logoutText]}>로그아웃</Text>
         </TouchableOpacity>
+        <TouchableOpacity style={styles.menuItem} onPress={handleDeleteAccount}>
+          <Ionicons name="trash-outline" size={24} color="#EF4444" />
+          <Text style={[styles.menuText, styles.logoutText]}>회원 탈퇴</Text>
+        </TouchableOpacity>
       </View>
 
-      <Text style={styles.version}>MediCheck v{appVersion}</Text>
+      <Text style={styles.version}>바로닥터 v{appVersion}</Text>
     </View>
   )
 }
