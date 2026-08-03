@@ -6,16 +6,20 @@ import {
   removeFavoriteHospital,
 } from '../api/hospitals'
 import { useAuth } from '../contexts/AuthContext'
+import type { Hospital } from '../types/hospital'
+
+const EMPTY_FAVORITES: Hospital[] = []
 
 export function useFavorites() {
   const { token } = useAuth()
   const queryClient = useQueryClient()
 
-  const { data: favorites = [] } = useQuery({
+  const { data } = useQuery({
     queryKey: ['favorites'],
     queryFn: () => fetchFavoriteHospitals(token!),
     enabled: !!token,
   })
+  const favorites = data ?? EMPTY_FAVORITES
 
   const favoriteIds = useMemo(() => new Set(favorites.map((h) => h.id)), [favorites])
 

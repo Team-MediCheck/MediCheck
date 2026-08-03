@@ -6,12 +6,14 @@ import { useFavorites } from '../../hooks/useFavorites'
 import { DEPARTMENTS, filterNearbyHospitals } from '../../lib/hospitalFilters'
 import type { NearbyHospital } from '../../types/hospital'
 
+/** useQuery 로딩 중 `data ?? []` 가 매 렌더 새 참조가 되지 않도록 */
+const EMPTY_HOSPITALS: NearbyHospital[] = []
+
 type SearchPanelProps = {
   latitude: number
   longitude: number
   radius: number
   onHospitalClick?: (item: NearbyHospital) => void
-  onPanToUser?: () => void
   onVisibleHospitalsChange?: (hospitals: NearbyHospital[]) => void
 }
 
@@ -20,7 +22,6 @@ export function SearchPanel({
   longitude,
   radius,
   onHospitalClick,
-  onPanToUser,
   onVisibleHospitalsChange,
 }: SearchPanelProps) {
   const [searchKeyword, setSearchKeyword] = useState('')
@@ -30,7 +31,7 @@ export function SearchPanel({
   const favoritesFilterActive = isLoggedIn && showFavoritesOnly
 
   const {
-    data: hospitals = [],
+    data,
     isLoading: hospitalsLoading,
     isError,
     error,
@@ -40,6 +41,7 @@ export function SearchPanel({
     queryFn: () => fetchNearbyHospitals(latitude, longitude, radius),
     enabled: !!latitude && !!longitude,
   })
+  const hospitals = data ?? EMPTY_HOSPITALS
 
   const handleToggleFavorite = useCallback(
     async (hospitalId: number) => {
@@ -79,19 +81,7 @@ export function SearchPanel({
           </span>
         </div>
 
-        {onPanToUser && (
-          <button
-            type="button"
-            onClick={onPanToUser}
-            className="w-full min-h-[44px] flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-sky-500 hover:bg-sky-600 text-white text-sm font-medium shadow-sm"
-            aria-label="내 위치로 이동"
-          >
-            <span aria-hidden>📍</span>
-            내 위치로 이동
-          </button>
-        )}
-
-        <div className="space-y-2 mt-3">
+        <div className="space-y-2">
           <input
             type="search"
             placeholder="병원명, 주소, 진료과 검색"

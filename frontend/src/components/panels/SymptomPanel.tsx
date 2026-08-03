@@ -8,6 +8,8 @@ import { SYMPTOM_PICKER_LABELS } from '../../lib/symptomPickerLabels'
 import type { Hospital, NearbyHospital } from '../../types/hospital'
 
 const PAGE_SIZE = 20
+/** 매 effect 실행마다 `[]` 리터럴을 넘기면 부모 setState 루프(React #185)가 날 수 있음 */
+const EMPTY_NEARBY: NearbyHospital[] = []
 
 function toNearbyItem(h: Hospital): NearbyHospital {
   return { hospital: h, distanceMeters: 0 }
@@ -110,7 +112,7 @@ export function SymptomPanel({ onHospitalsChange, onHospitalClick }: SymptomPane
   const loadErrorMessage = error ? userFacingQueryErrorMessage(error) : ''
 
   useEffect(() => {
-    onHospitalsChange?.(symptomReady ? nearbyItems : [])
+    onHospitalsChange?.(symptomReady ? nearbyItems : EMPTY_NEARBY)
   }, [nearbyItems, onHospitalsChange, symptomReady])
 
   useEffect(() => {

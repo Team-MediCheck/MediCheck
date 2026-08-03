@@ -1,10 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+  <!-- Matches App.tsx header: emerald→green rounded square + thick white hospital cross -->
   <rect width="32" height="32" rx="6" fill="url(#hospital-grad)"/>
-  <path fill="white" d="M14 6v8H6v4h8v8h4v-8h8v-4h-8V6h-4z"/>
+  <!-- Scaled from 24-viewBox path M8.5 2h7v6.5H22v7h-6.5V22h-7v-6.5H2v-7h6.5V2z -->
+  <path fill="white" d="M11.33 2.67h9.34v8.66H29.33v9.34h-8.66V29.33h-9.34v-8.66H2.67v-9.34h8.66V2.67z"/>
   <defs>
-    <linearGradient id="hospital-grad" x1="0" y1="0" x2="1" y2="1" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#0ea5e9"/>
-      <stop offset="1" stop-color="#06b6d4"/>
+    <linearGradient id="hospital-grad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#10b981"/>
+      <stop offset="1" stop-color="#16a34a"/>
     </linearGradient>
   </defs>
 </svg>

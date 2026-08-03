@@ -1,10 +1,14 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { fetchFavoriteHospitals } from '../../api/hospitals'
 import { HospitalListItem } from '../HospitalListItem'
 import { useAuth } from '../../contexts/AuthContext'
 import type { Hospital, NearbyHospital } from '../../types/hospital'
+
+/** useQuery `data ?? []` 기본값은 매 렌더 새 참조가 되어 effect 루프를 만들 수 있으므로 모듈 상수 사용 */
+const EMPTY_HOSPITALS: Hospital[] = []
+const EMPTY_NEARBY: NearbyHospital[] = []
 
 function toNearbyItem(h: Hospital): NearbyHospital {
   return { hospital: h, distanceMeters: 0 }
@@ -19,7 +23,7 @@ export function FavoritesPanel({ onHospitalsChange, onHospitalClick }: Favorites
   const { token, user, isLoading: authLoading } = useAuth()
 
   const {
-    data: hospitals = [],
+    data,
     isLoading,
     isError,
     error,
@@ -30,13 +34,16 @@ export function FavoritesPanel({ onHospitalsChange, onHospitalClick }: Favorites
     enabled: !!token && !!user,
   })
 
+  const hospitals = data ?? EMPTY_HOSPITALS
+  const nearbyItems = useMemo(() => hospitals.map(toNearbyItem), [hospitals])
+
   useEffect(() => {
     if (!token || !user) {
-      onHospitalsChange?.([])
+      onHospitalsChange?.(EMPTY_NEARBY)
       return
     }
-    onHospitalsChange?.(hospitals.map(toNearbyItem))
-  }, [hospitals, onHospitalsChange, token, user])
+    onHospitalsChange?.(nearbyItems)
+  }, [nearbyItems, onHospitalsChange, token, user])
 
   if (authLoading) {
     return (

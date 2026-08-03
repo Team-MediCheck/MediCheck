@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { fetchMe, type AuthUser } from '../api/auth'
 
@@ -57,8 +57,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => { cancelled = true }
   }, [token, logout])
 
+  const value = useMemo(
+    () => ({ user, token, isLoading, login, logout, setUser }),
+    [user, token, isLoading, login, logout]
+  )
+
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, logout, setUser }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   )

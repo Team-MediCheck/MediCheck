@@ -45,12 +45,13 @@ export function MainPage() {
   const { loaded: mapLoaded, error: mapError } = useKakaoMapScript()
   const { latitude, longitude, loading: geoLoading, error: geoError } = useGeolocation()
 
-  /** 증상별·즐겨찾기는 사이드바를 기본으로 연 상태 유지 */
-  const isPanelOpenForTab = activeTab !== 'search' || isPanelOpen
+  /** 모든 탭에서 패널 열림/닫힘 동일 (지도 영역 탭으로 닫기 가능) */
+  const isPanelOpenForTab = isPanelOpen
   const mapReady =
     !geoError && !mapError && !geoLoading && latitude != null && longitude != null
 
   useEffect(() => {
+    // 증상별·즐겨찾기로 이동할 때는 패널을 다시 연다
     if (activeTab !== 'search') setIsPanelOpen(true)
   }, [activeTab])
 
@@ -75,7 +76,17 @@ export function MainPage() {
   )
 
   const handleVisibleHospitalsChange = useCallback((hospitals: NearbyHospital[]) => {
-    setMapHospitals(hospitals)
+    // 자식 패널은 useQuery 로딩 시 매 렌더 새 배열을 올려보낼 수 있다.
+    // 내용이 같으면 setState 자체를 건너뛰어 "Maximum update depth exceeded"(React #185)를 막는다.
+    setMapHospitals((prev) => {
+      if (
+        prev.length === hospitals.length &&
+        prev.every((h, i) => h.hospital.id === hospitals[i]?.hospital.id)
+      ) {
+        return prev
+      }
+      return hospitals
+    })
   }, [])
 
   const handleHospitalClick = useCallback((item: NearbyHospital) => {
@@ -140,7 +151,6 @@ export function MainPage() {
         longitude={longitude}
         radius={radius}
         onHospitalClick={handleHospitalClick}
-        onPanToUser={() => mapRef.current?.panTo(latitude, longitude)}
         onVisibleHospitalsChange={handleVisibleHospitalsChange}
       />
     )
@@ -172,9 +182,7 @@ export function MainPage() {
         {isPanelOpenForTab && (
           <div
             className="absolute inset-0 z-10 bg-black/40 md:hidden pointer-events-auto"
-            onClick={() => {
-              if (activeTab === 'search') setIsPanelOpen(false)
-            }}
+            onClick={() => setIsPanelOpen(false)}
             aria-hidden
           />
         )}
@@ -184,7 +192,7 @@ export function MainPage() {
             ref={openPanelButtonRef}
             type="button"
             onClick={() => setIsPanelOpen(true)}
-            className="absolute top-1/2 left-0 -translate-y-1/2 translate-x-1/2 z-20 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-r-xl bg-white/95 border border-gray-200 shadow hover:bg-white pointer-events-auto"
+            className="absolute top-1/2 left-0 -translate-y-1/2 z-20 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-r-xl bg-white/95 border border-l-0 border-gray-200 shadow hover:bg-white pointer-events-auto"
             aria-label="패널 열기"
           >
             ▶
@@ -221,43 +229,36 @@ export function MainPage() {
           </div>
         )}
 
-        <div className="absolute top-4 right-4 z-20 flex items-start gap-2 pointer-events-none">
-          <div className="pointer-events-auto flex items-center gap-2">
-            <div className="px-4 py-2 bg-white/95 rounded-xl shadow text-sm text-gray-600">
-              <span className="font-semibold text-sky-600">{mapHospitals.length}</span>개 병원
-            </div>
-            {!isPanelOpenForTab && (
-              <button
-                type="button"
-                onClick={() => setIsPanelOpen(true)}
-                className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2.5 bg-white/95 rounded-xl shadow hover:bg-white"
-                aria-label="패널 열기"
+        {mapReady && (
+          <div
+            className={`absolute top-4 right-4 z-20 pointer-events-none ${
+              isPanelOpenForTab ? 'max-md:pointer-events-auto' : ''
+            }`}
+          >
+            <button
+              type="button"
+              onClick={() => mapRef.current?.panTo(latitude!, longitude!)}
+              className="pointer-events-auto w-11 h-11 flex items-center justify-center bg-white/95 hover:bg-white text-sky-600 rounded-xl shadow border border-gray-100"
+              aria-label="내 위치로 이동"
+              title="내 위치로 이동"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                className="w-5 h-5"
+                aria-hidden
               >
-                ▶
-              </button>
-            )}
+                <path d="M12 8a4 4 0 100 8 4 4 0 000-8zm8.94 3A8.994 8.994 0 0013 3.06V1h-2v2.06A8.994 8.994 0 003.06 11H1v2h2.06A8.994 8.994 0 0011 20.94V23h2v-2.06A8.994 8.994 0 0020.94 13H23v-2h-2.06zM12 19a7 7 0 110-14 7 7 0 010 14z" />
+              </svg>
+            </button>
           </div>
-        </div>
+        )}
       </div>
 
       <aside className={asideClassName} aria-hidden={!isPanelOpenForTab}>
         <div className="h-full flex flex-col relative z-10 pointer-events-auto bg-white">
           <div className="shrink-0 relative z-30 bg-white pointer-events-auto">
-            <div className="flex items-center justify-between md:hidden px-3 pt-2">
-              <span className="text-sm font-medium text-gray-700">메뉴</span>
-              {activeTab === 'search' ? (
-                <button
-                  type="button"
-                  onClick={() => setIsPanelOpen(false)}
-                  className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500"
-                  aria-label="패널 닫기"
-                >
-                  ✕
-                </button>
-              ) : (
-                <span className="min-w-[44px] min-h-[44px]" aria-hidden />
-              )}
-            </div>
             <SidebarNav />
           </div>
 
