@@ -68,12 +68,17 @@ export function HospitalListItem({
         <span className="truncate mr-2 flex items-center gap-1.5">
           {h.department ?? '-'}
           {hasEvaluation && evaluationScore != null && (
-            <span className="text-amber-500 flex-shrink-0">
-              <EvaluationStars score={evaluationScore} size="sm" />
+            <span className="flex-shrink-0">
+              <EvaluationStars
+                score={evaluationScore}
+                size="sm"
+                tone="hira"
+                invertHiraGrade
+              />
             </span>
           )}
           {hasEvaluation && evaluationScore == null && (
-            <span className="text-[10px] text-emerald-700 flex-shrink-0">★ 평가정보</span>
+            <span className="text-[10px] text-sky-700 flex-shrink-0">★ 평가정보</span>
           )}
         </span>
         <span className="text-sky-600 font-medium flex-shrink-0">

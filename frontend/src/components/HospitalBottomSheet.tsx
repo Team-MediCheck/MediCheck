@@ -1,6 +1,7 @@
 import type { NearbyHospital } from '../types/hospital'
 import { formatDistance, formatDate } from '../utils/format'
 import { EvaluationStars, getEvaluationStarScore } from './EvaluationStars'
+import { getHiraEvaluationRows } from '../lib/hiraEvaluation'
 import { HIRA_ATTR_BASIS, HIRA_ATTR_SHORT } from '../lib/hiraAttribution'
 
 interface HospitalBottomSheetProps {
@@ -51,6 +52,7 @@ export function HospitalBottomSheet({
       : null
   const hasEvaluation = !!h.evaluation
   const evaluationScore = getEvaluationStarScore(h.evaluation ?? undefined)
+  const evaluationRows = h.evaluation ? getHiraEvaluationRows(h.evaluation) : []
   const top5 = h.top5
   const top5Diseases = top5
     ? [top5.diseaseNm1, top5.diseaseNm2, top5.diseaseNm3, top5.diseaseNm4, top5.diseaseNm5].filter(
@@ -116,9 +118,13 @@ export function HospitalBottomSheet({
         <div className="px-4 pb-3 text-sm text-gray-300 space-y-1">
           {evaluationScore != null && (
             <div className="flex items-center gap-2">
-              <span className="text-amber-400">
-                <EvaluationStars score={evaluationScore} size="lg" />
-              </span>
+              <EvaluationStars
+                score={evaluationScore}
+                size="lg"
+                tone="hira"
+                invertHiraGrade
+                className="text-sky-400"
+              />
               <span className="text-gray-400 text-xs">심평원 평가</span>
             </div>
           )}
@@ -197,24 +203,42 @@ export function HospitalBottomSheet({
               <span>{formatDate(h.establishedDate)}</span>
             </div>
           )}
-          {hasEvaluation && evaluationScore != null && (
-            <div className="flex items-center gap-2 py-2 border-b border-gray-100">
-              <span className="text-gray-400 shrink-0" aria-hidden>⭐</span>
-              <div className="flex flex-col gap-0.5">
-                <div className="flex items-center gap-2">
-                  <EvaluationStars score={evaluationScore} size="md" className="text-amber-500" />
-                  <span className="text-sm text-gray-600">심평원 평가 {evaluationScore}점</span>
-                </div>
-                <span className="text-[11px] text-gray-400">{HIRA_ATTR_SHORT}</span>
+          {hasEvaluation && (
+            <div className="py-3 border-b border-gray-100 space-y-2">
+              <div className="flex items-center gap-2">
+                {evaluationScore != null ? (
+                  <EvaluationStars
+                    score={evaluationScore}
+                    size="md"
+                    tone="hira"
+                    invertHiraGrade
+                  />
+                ) : null}
+                <span className="text-sm font-medium text-sky-700">심평원 평가</span>
               </div>
+              <p className="text-[11px] text-gray-400">{HIRA_ATTR_SHORT} · 병원평가정보</p>
+              {evaluationRows.length > 0 ? (
+                <ul className="rounded-xl border border-sky-100 bg-sky-50/60 divide-y divide-sky-100 overflow-hidden">
+                  {evaluationRows.map((row) => (
+                    <li
+                      key={row.key}
+                      className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+                    >
+                      <span className="text-slate-700 min-w-0">{row.label}</span>
+                      <span className="shrink-0 font-semibold text-sky-800 tabular-nums">
+                        {/^\d+$/.test(row.value) ? `${row.value}등급` : row.value}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-emerald-700">
+                  심평원 병원평가정보가 있는 병원입니다.
+                </p>
+              )}
             </div>
           )}
           <div className="pt-2 space-y-1">
-            {hasEvaluation && evaluationScore == null && (
-              <p className="text-xs text-emerald-700">
-                심평원 병원평가정보가 있는 병원입니다.
-              </p>
-            )}
             {hasTop5 && (
               <div className="pt-2">
                 <div className="text-xs font-medium text-gray-700 mb-1">

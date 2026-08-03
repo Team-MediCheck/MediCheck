@@ -107,9 +107,7 @@ export default function HospitalCard({
                       />
                     ))}
                   </View>
-                  <Text style={styles.hiraHint}>
-                    등급 평균 {hiraStarAvg} (1이 우수)
-                  </Text>
+                <Text style={styles.hiraHint}>1등급이 우수</Text>
                 </>
               ) : (
                 <Text style={styles.hiraFallback}>등급 {hiraRowCount}항목</Text>

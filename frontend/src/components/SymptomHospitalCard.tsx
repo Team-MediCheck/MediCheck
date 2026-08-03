@@ -92,8 +92,13 @@ export function SymptomHospitalCard({
             <span className="font-bold text-sky-700">심평원</span>
             {hiraScore != null ? (
               <>
-                <EvaluationStars score={hiraScore} size="sm" className="text-sky-600" />
-                <span className="text-slate-500">등급 평균 {hiraScore} (1이 우수)</span>
+                <EvaluationStars
+                  score={hiraScore}
+                  size="sm"
+                  tone="hira"
+                  invertHiraGrade
+                />
+                <span className="text-slate-500">1등급이 우수</span>
               </>
             ) : (
               <span className="text-slate-600 font-medium">등급 {hiraCount}항목</span>

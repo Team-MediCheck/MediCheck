@@ -25,9 +25,7 @@ function HiraStarRow({ gradeAverage }: { gradeAverage: number }) {
           color="#0284C7"
         />
       ))}
-      <Text style={styles.starScoreText}>
-        (등급 평균 {rounded}, 1등급이 가장 우수)
-      </Text>
+      <Text style={styles.starScoreText}>1등급이 가장 우수</Text>
     </View>
   )
 }

@@ -156,10 +156,6 @@ export default function HospitalDetailScreen() {
                       color="#0284C7"
                     />
                   ))}
-                  <Text style={styles.hiraHeaderScoreText}>
-                    {' '}
-                    평균 약 {hiraStarScore}/5
-                  </Text>
                 </View>
               ) : hiraRowCount > 0 ? (
                 <Text style={styles.hiraHeaderSub}>항목별 등급 · 아래에서 확인</Text>
