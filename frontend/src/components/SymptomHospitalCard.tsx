@@ -1,5 +1,6 @@
 import type { Hospital, NearbyHospital } from '../types/hospital'
 import { EvaluationStars, getEvaluationStarScore } from './EvaluationStars'
+import { HIRA_ATTR_SHORT } from '../lib/hiraAttribution'
 
 function countHiraEntries(evaluation: Hospital['evaluation']): number {
   if (!evaluation) return 0
@@ -86,16 +87,19 @@ export function SymptomHospitalCard({
       </div>
 
       {showHira && (
-        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
-          <span className="font-bold text-sky-700">심평원</span>
-          {hiraScore != null ? (
-            <>
-              <EvaluationStars score={hiraScore} size="sm" className="text-sky-600" />
-              <span className="text-slate-500">등급 평균 {hiraScore} (1이 우수)</span>
-            </>
-          ) : (
-            <span className="text-slate-600 font-medium">등급 {hiraCount}항목</span>
-          )}
+        <div className="mt-2 flex flex-col gap-0.5">
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="font-bold text-sky-700">심평원</span>
+            {hiraScore != null ? (
+              <>
+                <EvaluationStars score={hiraScore} size="sm" className="text-sky-600" />
+                <span className="text-slate-500">등급 평균 {hiraScore} (1이 우수)</span>
+              </>
+            ) : (
+              <span className="text-slate-600 font-medium">등급 {hiraCount}항목</span>
+            )}
+          </div>
+          <span className="text-[10px] text-slate-400">{HIRA_ATTR_SHORT}</span>
         </div>
       )}
 

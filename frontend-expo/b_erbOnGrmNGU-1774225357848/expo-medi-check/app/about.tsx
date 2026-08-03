@@ -20,6 +20,9 @@ export default function AboutScreen() {
 
       <Text style={styles.desc}>
         주변 병원 검색, 길찾기, 리뷰 등을 제공하는 LBS 기반 안심 병원 찾기 서비스입니다.
+        {'\n\n'}
+        병원평가·진료 Top5 정보는 건강보험심사평가원(심평원) 공공데이터를 활용합니다.
+        바로닥터는 의료기기가 아니며 진단·처방을 제공하지 않습니다.
       </Text>
 
       <View style={styles.section}>

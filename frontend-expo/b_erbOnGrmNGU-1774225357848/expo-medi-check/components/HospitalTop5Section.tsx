@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet } from 'react-native'
 import type { HospitalTop5Summary } from '@/types'
+import { HIRA_ATTR_BASIS, HIRA_ATTR_SHORT } from '@/lib/hiraAttribution'
 
 type Props = {
   top5: HospitalTop5Summary | null | undefined
@@ -21,7 +22,7 @@ export function HospitalTop5Section({ top5 }: Props) {
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>상위 5개 진료과목</Text>
-      <Text style={styles.subtitle}>심평원 병원진료정보조회서비스 기준</Text>
+      <Text style={styles.subtitle}>{HIRA_ATTR_SHORT} · 병원진료정보조회서비스</Text>
 
       {top5?.crtrYm ? (
         <Text style={styles.meta}>기준년월 · {top5.crtrYm}</Text>
@@ -43,6 +44,8 @@ export function HospitalTop5Section({ top5 }: Props) {
           연동된 상위 5개 진료과목 정보가 없습니다. 관리자 동기화 후 다시 확인해 주세요.
         </Text>
       )}
+
+      {hasAny ? <Text style={styles.footnote}>{HIRA_ATTR_BASIS}</Text> : null}
     </View>
   )
 }
@@ -97,5 +100,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#94A3B8',
     lineHeight: 20,
+  },
+  footnote: {
+    marginTop: 12,
+    fontSize: 11,
+    color: '#94A3B8',
+    lineHeight: 16,
   },
 })

@@ -6,6 +6,7 @@ import {
   getHiraEvaluationRows,
   getHiraGradeAverageAsStarFill,
 } from '@/lib/hiraEvaluation'
+import { HIRA_ATTR_BASIS, HIRA_ATTR_SHORT } from '@/lib/hiraAttribution'
 
 type Props = {
   evaluation: HospitalEvaluationSummary | null | undefined
@@ -52,7 +53,7 @@ export function HiraEvaluationSection({ evaluation }: Props) {
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>심평원 병원평가</Text>
-      <Text style={styles.subtitle}>건강보험심사평가원 병원평가정보 기준</Text>
+      <Text style={styles.subtitle}>{HIRA_ATTR_SHORT} · 병원평가정보</Text>
 
       {evaluation.clCdNm ? (
         <Text style={styles.meta}>종별 · {evaluation.clCdNm}</Text>
@@ -84,9 +85,7 @@ export function HiraEvaluationSection({ evaluation }: Props) {
         <Text style={styles.muted}>표시할 세부 등급 항목이 없습니다.</Text>
       )}
 
-      <Text style={styles.footnote}>
-        ※ 등급·항목 의미는 항목마다 다를 수 있으니 심평원 병원평가 공시 자료를 참고하세요.
-      </Text>
+      <Text style={styles.footnote}>{HIRA_ATTR_BASIS}</Text>
     </View>
   )
 }

@@ -6,6 +6,7 @@ import {
   getEvaluationStarScore,
   getHiraGradeAverageAsStarFill,
 } from '@/lib/hiraEvaluation'
+import { HIRA_ATTR_SHORT } from '@/lib/hiraAttribution'
 
 interface HospitalCardProps {
   hospital: Hospital
@@ -90,28 +91,31 @@ export default function HospitalCard({
         </View>
 
         {showHiraOnCard ? (
-          <View style={styles.hiraRow}>
-            <Ionicons name="ribbon-outline" size={14} color="#0284C7" />
-            <Text style={styles.hiraLabel}>심평원</Text>
-            {hiraStarFill != null ? (
-              <>
-                <View style={styles.hiraStars}>
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <Ionicons
-                      key={i}
-                      name={i <= hiraStarFill ? 'star' : 'star-outline'}
-                      size={12}
-                      color="#0284C7"
-                    />
-                  ))}
-                </View>
-                <Text style={styles.hiraHint}>
-                  등급 평균 {hiraStarAvg} (1이 우수)
-                </Text>
-              </>
-            ) : (
-              <Text style={styles.hiraFallback}>등급 {hiraRowCount}항목</Text>
-            )}
+          <View style={styles.hiraBlock}>
+            <View style={styles.hiraRow}>
+              <Ionicons name="ribbon-outline" size={14} color="#0284C7" />
+              <Text style={styles.hiraLabel}>심평원</Text>
+              {hiraStarFill != null ? (
+                <>
+                  <View style={styles.hiraStars}>
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <Ionicons
+                        key={i}
+                        name={i <= hiraStarFill ? 'star' : 'star-outline'}
+                        size={12}
+                        color="#0284C7"
+                      />
+                    ))}
+                  </View>
+                  <Text style={styles.hiraHint}>
+                    등급 평균 {hiraStarAvg} (1이 우수)
+                  </Text>
+                </>
+              ) : (
+                <Text style={styles.hiraFallback}>등급 {hiraRowCount}항목</Text>
+              )}
+            </View>
+            <Text style={styles.hiraAttr}>{HIRA_ATTR_SHORT}</Text>
           </View>
         ) : null}
       </View>
@@ -191,6 +195,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 16,
   },
+  hiraBlock: {
+    gap: 2,
+  },
   hiraRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -201,6 +208,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#0369A1',
+  },
+  hiraAttr: {
+    fontSize: 10,
+    color: '#94A3B8',
+    marginLeft: 18,
   },
   hiraStars: {
     flexDirection: 'row',

@@ -22,6 +22,15 @@ export function PrivacyPage() {
             <p>관련 법령 또는 회원 탈퇴(계정 삭제) 시까지. 위치 정보는 검색 시에만 사용하며 기기 설정에서 권한을 철회할 수 있습니다.</p>
           </section>
           <section>
+            <h2 className="font-semibold text-gray-900 mb-1">데이터 출처·평가 근거</h2>
+            <p>
+              병원평가·진료 Top5 정보는 건강보험심사평가원(심평원)이 공개하는
+              병원평가정보 및 병원진료정보조회서비스(공공데이터)를 활용합니다.
+              항목별 등급 의미가 다를 수 있으며, 바로닥터는 의료기기가 아니며
+              진단·처방을 제공하지 않습니다.
+            </p>
+          </section>
+          <section>
             <h2 className="font-semibold text-gray-900 mb-1">계정·데이터 삭제</h2>
             <p>
               삭제 요청 방법과 삭제·보관 데이터는{' '}

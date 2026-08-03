@@ -1,6 +1,7 @@
 import type { NearbyHospital } from '../types/hospital'
 import { formatDistance, formatDate } from '../utils/format'
 import { EvaluationStars, getEvaluationStarScore } from './EvaluationStars'
+import { HIRA_ATTR_BASIS, HIRA_ATTR_SHORT } from '../lib/hiraAttribution'
 
 interface HospitalBottomSheetProps {
   item: NearbyHospital
@@ -199,9 +200,12 @@ export function HospitalBottomSheet({
           {hasEvaluation && evaluationScore != null && (
             <div className="flex items-center gap-2 py-2 border-b border-gray-100">
               <span className="text-gray-400 shrink-0" aria-hidden>⭐</span>
-              <div className="flex items-center gap-2">
-                <EvaluationStars score={evaluationScore} size="md" className="text-amber-500" />
-                <span className="text-sm text-gray-600">심평원 평가 {evaluationScore}점</span>
+              <div className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-2">
+                  <EvaluationStars score={evaluationScore} size="md" className="text-amber-500" />
+                  <span className="text-sm text-gray-600">심평원 평가 {evaluationScore}점</span>
+                </div>
+                <span className="text-[11px] text-gray-400">{HIRA_ATTR_SHORT}</span>
               </div>
             </div>
           )}
@@ -219,6 +223,7 @@ export function HospitalBottomSheet({
                     <span className="text-xs text-gray-400 ml-2">기준 {top5.crtrYm}</span>
                   ) : null}
                 </div>
+                <p className="text-[11px] text-gray-400 mb-1.5">{HIRA_ATTR_SHORT} · 병원진료정보조회서비스</p>
                 <div className="flex flex-wrap gap-2">
                   {top5Diseases.map((d, idx) => (
                     <span
@@ -230,6 +235,11 @@ export function HospitalBottomSheet({
                   ))}
                 </div>
               </div>
+            )}
+            {(hasEvaluation || hasTop5) && (
+              <p className="text-[11px] text-gray-400 leading-relaxed pt-2 border-t border-gray-100 mt-2">
+                {HIRA_ATTR_BASIS}
+              </p>
             )}
             <p className="text-xs text-gray-400">
               ※ 진료 시간은 병원에 문의해 주세요

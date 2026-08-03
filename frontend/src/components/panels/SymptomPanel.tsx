@@ -6,6 +6,7 @@ import { useFavorites } from '../../hooks/useFavorites'
 import { useGeolocation } from '../../hooks/useGeolocation'
 import { SYMPTOM_PICKER_LABELS } from '../../lib/symptomPickerLabels'
 import type { Hospital, NearbyHospital } from '../../types/hospital'
+import { HIRA_ATTR_SHORT } from '../../lib/hiraAttribution'
 
 const PAGE_SIZE = 20
 /** 매 effect 실행마다 `[]` 리터럴을 넘기면 부모 setState 루프(React #185)가 날 수 있음 */
@@ -201,7 +202,8 @@ export function SymptomPanel({ onHospitalsChange, onHospitalClick }: SymptomPane
           병원이 먼저 나옵니다.
           {hasCoords
             ? ' 같은 순위는 현재 위치 기준 가까운 순입니다.'
-            : ' 위치 권한을 허용하면 같은 순위를 가까운 순으로 정렬합니다.'}
+            : ' 위치 권한을 허용하면 같은 순위를 가까운 순으로 정렬합니다.'}{' '}
+          ({HIRA_ATTR_SHORT} · 병원진료정보 Top5)
         </p>
       </div>
 
