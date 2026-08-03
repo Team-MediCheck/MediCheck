@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { login } from '../api/auth'
+import { getKakaoOAuthRedirectUri } from '../lib/kakaoOAuthRedirect'
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -10,6 +11,13 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  const handleKakaoLogin = () => {
+    const redirectUri = getKakaoOAuthRedirectUri()
+    const params = new URLSearchParams({ redirectUri })
+    // REST API 키(client_id)는 백엔드에서 주입해 인가 URL로 리다이렉트한다.
+    window.location.href = `/api/auth/kakao/authorize?${params.toString()}`
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -70,6 +78,13 @@ export function LoginPage() {
             className="w-full py-2.5 rounded-lg bg-sky-500 hover:bg-sky-600 text-white font-medium disabled:opacity-50"
           >
             {submitting ? '로그인 중...' : '로그인'}
+          </button>
+          <button
+            type="button"
+            onClick={handleKakaoLogin}
+            className="w-full py-2.5 rounded-lg bg-yellow-300 hover:bg-yellow-400 text-gray-900 font-medium border border-yellow-300"
+          >
+            카카오로 로그인
           </button>
         </form>
         <p className="mt-4 text-center text-sm text-gray-500">

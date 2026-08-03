@@ -359,8 +359,6 @@ export default function LoginScreen() {
     },
   })
 
-  /** 카카오 로그인 UI는 비활성화됨. 백엔드·OAuth 플로우 재노출 시 버튼에서 `mutate()` 연결 */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- mutation 객체 보존(버튼 없음)
   const kakaoMutation = useMutation({
     mutationFn: async () => {
       if (Platform.OS === 'android' && USE_ANDROID_KAKAO_NATIVE_SDK) {
@@ -639,6 +637,19 @@ export default function LoginScreen() {
     loginMutation.mutate()
   }
 
+  const handleKakaoLogin = () => {
+    if (Platform.OS === 'web') {
+      Alert.alert(
+        '안내',
+        'Expo 웹에서는 카카오 리다이렉트가 제한될 수 있습니다. Vite 웹(frontend) 로그인 또는 iOS/Android 앱을 이용해 주세요.'
+      )
+      return
+    }
+    kakaoMutation.mutate()
+  }
+
+  const kakaoBusy = kakaoMutation.isPending
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -649,7 +660,7 @@ export default function LoginScreen() {
           <View style={styles.logo}>
             <Ionicons name="medical" size={40} color="#0EA5E9" />
           </View>
-          <Text style={styles.title}>MediCheck</Text>
+          <Text style={styles.title}>바로닥터</Text>
           <Text style={styles.subtitle}>내 주변 안심 병원 찾기</Text>
         </View>
 
@@ -689,7 +700,7 @@ export default function LoginScreen() {
           <TouchableOpacity
             style={[styles.loginButton, loginMutation.isPending && styles.buttonDisabled]}
             onPress={handleLogin}
-            disabled={loginMutation.isPending}
+            disabled={loginMutation.isPending || kakaoBusy}
           >
             {loginMutation.isPending ? (
               <ActivityIndicator color="#FFFFFF" />
@@ -698,6 +709,17 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
+          <TouchableOpacity
+            style={[styles.kakaoButton, kakaoBusy && styles.buttonDisabled]}
+            onPress={handleKakaoLogin}
+            disabled={kakaoBusy || loginMutation.isPending}
+          >
+            {kakaoBusy ? (
+              <ActivityIndicator color="#3C1E1E" />
+            ) : (
+              <Text style={styles.kakaoButtonText}>카카오로 로그인</Text>
+            )}
+          </TouchableOpacity>
         </View>
 
         <View style={styles.footer}>
@@ -780,6 +802,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  kakaoButton: {
+    backgroundColor: '#FEE500',
+    height: 52,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  kakaoButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#3C1E1E',
   },
   footer: {
     flexDirection: 'row',
