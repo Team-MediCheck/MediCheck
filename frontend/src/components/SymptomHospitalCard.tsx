@@ -1,6 +1,5 @@
 import type { Hospital, NearbyHospital } from '../types/hospital'
 import { EvaluationStars, getEvaluationStarScore } from './EvaluationStars'
-import { HIRA_ATTR_SHORT } from '../lib/hiraAttribution'
 
 function countHiraEntries(evaluation: Hospital['evaluation']): number {
   if (!evaluation) return 0
@@ -31,6 +30,7 @@ export function SymptomHospitalCard({
   const hiraScore = getEvaluationStarScore(h.evaluation ?? undefined)
   const hiraCount = countHiraEntries(h.evaluation)
   const showHira = h.evaluation != null && (hiraScore != null || hiraCount > 0)
+  const hasUserRating = h.averageRating != null
   const topDiseases = [
     h.top5?.diseaseNm1,
     h.top5?.diseaseNm2,
@@ -73,40 +73,40 @@ export function SymptomHospitalCard({
       <div className="font-bold text-slate-800 text-base truncate">{h.name}</div>
       <div className="text-sm text-slate-500 truncate mt-0.5">{h.address ?? '-'}</div>
 
-      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-        <span className="inline-flex items-center gap-1 text-slate-800">
-          <span className="text-amber-400" aria-hidden>
-            ★
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
+        {hasUserRating && (
+          <span className="inline-flex items-center gap-1" title="사용자 리뷰">
+            <span className="font-semibold text-amber-700">사용자</span>
+            <EvaluationStars
+              score={Math.round(h.averageRating!)}
+              size="sm"
+              tone="review"
+            />
+            <span className="text-amber-800/80 tabular-nums">
+              {h.averageRating!.toFixed(1)}
+              <span className="text-slate-400">({h.reviewCount ?? 0})</span>
+            </span>
           </span>
-          <span className="font-semibold">{h.averageRating?.toFixed(1) ?? '-'}</span>
-          <span className="text-slate-400 text-xs">({h.reviewCount ?? 0})</span>
-        </span>
+        )}
+        {showHira && (
+          <span className="inline-flex items-center gap-1" title="심평원 평가">
+            <span className="font-semibold text-sky-700">심평원</span>
+            {hiraScore != null ? (
+              <EvaluationStars
+                score={hiraScore}
+                size="sm"
+                tone="hira"
+                invertHiraGrade
+              />
+            ) : (
+              <span className="text-slate-600">등급 {hiraCount}항목</span>
+            )}
+          </span>
+        )}
         {h.doctorTotalCount != null && h.doctorTotalCount > 0 && (
-          <span className="text-xs text-slate-500">의사 {h.doctorTotalCount}명</span>
+          <span className="text-slate-500">의사 {h.doctorTotalCount}명</span>
         )}
       </div>
-
-      {showHira && (
-        <div className="mt-2 flex flex-col gap-0.5">
-          <div className="flex flex-wrap items-center gap-1.5 text-xs">
-            <span className="font-bold text-sky-700">심평원</span>
-            {hiraScore != null ? (
-              <>
-                <EvaluationStars
-                  score={hiraScore}
-                  size="sm"
-                  tone="hira"
-                  invertHiraGrade
-                />
-                <span className="text-slate-500">1등급이 우수</span>
-              </>
-            ) : (
-              <span className="text-slate-600 font-medium">등급 {hiraCount}항목</span>
-            )}
-          </div>
-          <span className="text-[10px] text-slate-400">{HIRA_ATTR_SHORT}</span>
-        </div>
-      )}
 
       {topDiseases.length > 0 && (
         <div className="mt-2.5 flex flex-wrap gap-1.5">

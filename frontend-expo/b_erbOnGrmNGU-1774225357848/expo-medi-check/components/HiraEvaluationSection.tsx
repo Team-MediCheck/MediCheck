@@ -92,7 +92,9 @@ export function HiraEvaluationSection({ evaluation }: Props) {
                   <Text style={styles.tableLabel} numberOfLines={2}>
                     {row.label}
                   </Text>
-                  <Text style={styles.tableValue}>{row.value}</Text>
+                  <Text style={styles.tableValue}>
+                    {/^\d+$/.test(row.value) ? `${row.value}등급` : row.value}
+                  </Text>
                 </View>
               ))
             : null}

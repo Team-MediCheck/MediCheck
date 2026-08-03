@@ -6,7 +6,6 @@ import {
   getEvaluationStarScore,
   getHiraGradeAverageAsStarFill,
 } from '@/lib/hiraEvaluation'
-import { HIRA_ATTR_SHORT } from '@/lib/hiraAttribution'
 
 interface HospitalCardProps {
   hospital: Hospital
@@ -39,6 +38,12 @@ export default function HospitalCard({
     hiraEval != null ? countHiraEvaluationEntries(hiraEval) : 0
   const showHiraOnCard =
     hiraEval != null && (hiraStarAvg != null || hiraRowCount > 0)
+  const userStarFill =
+    hospital.averageRating != null
+      ? Math.min(5, Math.max(0, Math.round(hospital.averageRating)))
+      : null
+  const hasUserRating =
+    hospital.averageRating != null && (hospital.reviewCount ?? 0) > 0
 
   return (
     <TouchableOpacity
@@ -68,16 +73,50 @@ export default function HospitalCard({
         {hospital.address ?? '-'}
       </Text>
 
-      <View style={styles.footer}>
-        <View style={styles.footerMain}>
-          <View style={styles.ratingContainer}>
-            <Ionicons name="star" size={14} color="#FBBF24" />
-            <Text style={styles.rating}>
-              {hospital.averageRating?.toFixed(1) ?? '-'}
-            </Text>
-            <Text style={styles.reviewCount}>
-              ({hospital.reviewCount ?? 0})
-            </Text>
+      {(hasUserRating || showHiraOnCard) && (
+        <View style={styles.footer}>
+          <View style={styles.ratingRow}>
+            {hasUserRating && userStarFill != null ? (
+              <View style={styles.ratingGroup} accessibilityLabel="사용자 리뷰">
+                <Text style={styles.userLabel}>사용자</Text>
+                <View style={styles.hiraStars}>
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <Ionicons
+                      key={i}
+                      name={i <= userStarFill ? 'star' : 'star-outline'}
+                      size={12}
+                      color="#F59E0B"
+                    />
+                  ))}
+                </View>
+                <Text style={styles.userRating}>
+                  {hospital.averageRating!.toFixed(1)}
+                </Text>
+                <Text style={styles.reviewCount}>
+                  ({hospital.reviewCount ?? 0})
+                </Text>
+              </View>
+            ) : null}
+
+            {showHiraOnCard ? (
+              <View style={styles.ratingGroup} accessibilityLabel="심평원 평가">
+                <Text style={styles.hiraLabel}>심평원</Text>
+                {hiraStarFill != null ? (
+                  <View style={styles.hiraStars}>
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <Ionicons
+                        key={i}
+                        name={i <= hiraStarFill ? 'star' : 'star-outline'}
+                        size={12}
+                        color="#0284C7"
+                      />
+                    ))}
+                  </View>
+                ) : (
+                  <Text style={styles.hiraFallback}>등급 {hiraRowCount}항목</Text>
+                )}
+              </View>
+            ) : null}
           </View>
 
           {hospital.doctorTotalCount !== null && hospital.doctorTotalCount > 0 && (
@@ -89,34 +128,18 @@ export default function HospitalCard({
             </View>
           )}
         </View>
+      )}
 
-        {showHiraOnCard ? (
-          <View style={styles.hiraBlock}>
-            <View style={styles.hiraRow}>
-              <Ionicons name="ribbon-outline" size={14} color="#0284C7" />
-              <Text style={styles.hiraLabel}>심평원</Text>
-              {hiraStarFill != null ? (
-                <>
-                  <View style={styles.hiraStars}>
-                    {[1, 2, 3, 4, 5].map((i) => (
-                      <Ionicons
-                        key={i}
-                        name={i <= hiraStarFill ? 'star' : 'star-outline'}
-                        size={12}
-                        color="#0284C7"
-                      />
-                    ))}
-                  </View>
-                <Text style={styles.hiraHint}>1등급이 우수</Text>
-                </>
-              ) : (
-                <Text style={styles.hiraFallback}>등급 {hiraRowCount}항목</Text>
-              )}
-            </View>
-            <Text style={styles.hiraAttr}>{HIRA_ATTR_SHORT}</Text>
+      {!(hasUserRating || showHiraOnCard) &&
+        hospital.doctorTotalCount !== null &&
+        hospital.doctorTotalCount > 0 && (
+          <View style={styles.doctorContainer}>
+            <Ionicons name="medical-outline" size={14} color="#64748B" />
+            <Text style={styles.doctorCount}>
+              의사 {hospital.doctorTotalCount}명
+            </Text>
           </View>
-        ) : null}
-      </View>
+        )}
 
       {hospital.top5 && hospital.top5.diseaseNm1 && (
         <View style={styles.tags}>
@@ -186,54 +209,29 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   footer: {
-    gap: 8,
-  },
-  footerMain: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    justifyContent: 'space-between',
+    gap: 8,
   },
-  hiraBlock: {
-    gap: 2,
-  },
-  hiraRow: {
+  ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
+    gap: 12,
+    flex: 1,
+  },
+  ratingGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 4,
   },
-  hiraLabel: {
+  userLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#0369A1',
+    color: '#B45309',
   },
-  hiraAttr: {
-    fontSize: 10,
-    color: '#94A3B8',
-    marginLeft: 18,
-  },
-  hiraStars: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 1,
-    marginLeft: 2,
-  },
-  hiraHint: {
-    fontSize: 11,
-    color: '#64748B',
-    marginLeft: 2,
-  },
-  hiraFallback: {
-    fontSize: 12,
-    color: '#475569',
-    fontWeight: '500',
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  rating: {
+  userRating: {
     fontSize: 13,
     fontWeight: '600',
     color: '#1E293B',
@@ -241,6 +239,21 @@ const styles = StyleSheet.create({
   reviewCount: {
     fontSize: 12,
     color: '#94A3B8',
+  },
+  hiraLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0369A1',
+  },
+  hiraStars: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 1,
+  },
+  hiraFallback: {
+    fontSize: 12,
+    color: '#475569',
+    fontWeight: '500',
   },
   doctorContainer: {
     flexDirection: 'row',

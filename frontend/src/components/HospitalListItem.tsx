@@ -32,6 +32,9 @@ export function HospitalListItem({
   const h = item.hospital
   const hasEvaluation = !!h.evaluation
   const evaluationScore = getEvaluationStarScore(h.evaluation ?? undefined)
+  const hasUserRating = h.averageRating != null && (h.reviewCount ?? 0) > 0
+  const showRatingRow = hasUserRating || hasEvaluation
+
   return (
     <div
       className="w-full px-4 py-3 rounded-xl hover:bg-sky-50 active:bg-sky-100 transition-colors border border-transparent hover:border-sky-100 cursor-pointer"
@@ -64,11 +67,33 @@ export function HospitalListItem({
           </button>
         )}
       </div>
+
       <div className="flex items-center justify-between mt-1 text-xs text-gray-500">
-        <span className="truncate mr-2 flex items-center gap-1.5">
-          {h.department ?? '-'}
+        <span className="truncate mr-2">{h.department ?? '-'}</span>
+        <span className="text-sky-600 font-medium flex-shrink-0">
+          {showDistance && item.distanceMeters > 0 ? formatDistance(item.distanceMeters) : null}
+        </span>
+      </div>
+
+      {showRatingRow && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+          {hasUserRating && (
+            <span className="inline-flex items-center gap-1" title="사용자 리뷰">
+              <span className="text-[10px] font-semibold text-amber-700">사용자</span>
+              <EvaluationStars
+                score={Math.round(h.averageRating!)}
+                size="sm"
+                tone="review"
+              />
+              <span className="text-amber-700/80 tabular-nums">
+                {h.averageRating!.toFixed(1)}
+                <span className="text-gray-400 font-normal">({h.reviewCount})</span>
+              </span>
+            </span>
+          )}
           {hasEvaluation && evaluationScore != null && (
-            <span className="flex-shrink-0">
+            <span className="inline-flex items-center gap-1" title="심평원 평가">
+              <span className="text-[10px] font-semibold text-sky-700">심평원</span>
               <EvaluationStars
                 score={evaluationScore}
                 size="sm"
@@ -78,18 +103,11 @@ export function HospitalListItem({
             </span>
           )}
           {hasEvaluation && evaluationScore == null && (
-            <span className="text-[10px] text-sky-700 flex-shrink-0">★ 평가정보</span>
+            <span className="text-[10px] text-sky-700">심평원 평가정보</span>
           )}
-        </span>
-        <span className="text-sky-600 font-medium flex-shrink-0">
-          {showDistance && item.distanceMeters > 0 ? formatDistance(item.distanceMeters) : null}
-        </span>
-      </div>
-      {(h.averageRating != null && (h.reviewCount ?? 0) > 0) && (
-        <div className="text-xs text-amber-600 mt-0.5">
-          ★ {h.averageRating.toFixed(1)} (리뷰 {h.reviewCount}개)
         </div>
       )}
+
       {doctorSummary(h) && (
         <div className="text-xs text-gray-500 mt-0.5">{doctorSummary(h)}</div>
       )}

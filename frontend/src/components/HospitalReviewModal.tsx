@@ -102,10 +102,10 @@ export function HospitalReviewModal({
         aria-label="모달 닫기"
       />
       <div
-        className="relative flex max-h-[85vh] w-full max-w-md flex-col rounded-2xl bg-white shadow-xl"
+        className="relative flex max-h-[min(85dvh,85vh)] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+        <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-4 py-3">
           <h3 className="font-semibold text-gray-800">{hospitalName}</h3>
           <button
             type="button"
@@ -117,7 +117,7 @@ export function HospitalReviewModal({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 space-y-4 [-webkit-overflow-scrolling:touch]">
           {token && (
             <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
               <p className="mb-2 text-sm font-medium text-gray-700">

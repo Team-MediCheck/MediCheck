@@ -84,6 +84,12 @@ export function getHiraGradeAverageAsStarFill(gradeAverage: number): number {
 
 export type HiraEvalRow = { key: string; label: string; value: string }
 
+/** 숫자 등급(1=우수) 오름차순. 비숫자(등급제외 등)는 뒤로 */
+function gradeSortKey(value: string): number {
+  const n = parseInt(value.trim(), 10)
+  return Number.isFinite(n) && n >= 1 && n <= 5 ? n : 99
+}
+
 export function getHiraEvaluationRows(
   evaluation: HospitalEvaluationSummary
 ): HiraEvalRow[] {
@@ -97,5 +103,10 @@ export function getHiraEvaluationRows(
       value: String(raw).trim(),
     })
   }
+  rows.sort((a, b) => {
+    const diff = gradeSortKey(a.value) - gradeSortKey(b.value)
+    if (diff !== 0) return diff
+    return a.label.localeCompare(b.label, 'ko')
+  })
   return rows
 }

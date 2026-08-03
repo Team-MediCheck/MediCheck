@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { NearbyHospital } from '../types/hospital'
-import { formatDistance, formatDate } from '../utils/format'
+import { formatDate } from '../utils/format'
 import { EvaluationStars, getEvaluationStarScore } from './EvaluationStars'
 import { getHiraEvaluationRows } from '../lib/hiraEvaluation'
 import { HIRA_ATTR_BASIS, HIRA_ATTR_SHORT } from '../lib/hiraAttribution'
@@ -52,13 +52,17 @@ export function HospitalBottomSheet({
     setBasisOpen(false)
   }, [h.id])
 
+  useEffect(() => {
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [])
+
   const lat = h.latitude ?? 0
   const lng = h.longitude ?? 0
   const hasDirections = lat !== 0 && lng !== 0
-  const reviewText =
-    h.reviewCount != null && h.reviewCount > 0
-      ? `리뷰 ${h.reviewCount}개`
-      : null
   const hasEvaluation = !!h.evaluation
   const evaluationScore = getEvaluationStarScore(h.evaluation ?? undefined)
   const evaluationRows = h.evaluation ? getHiraEvaluationRows(h.evaluation) : []
@@ -69,11 +73,6 @@ export function HospitalBottomSheet({
       )
     : []
   const hasTop5 = top5Diseases.length > 0
-  const typeParts = [h.department]
-  if (hasEvaluation) typeParts.push('심평원 평가정보')
-  if (hasTop5) typeParts.push('진료 Top5')
-  if (reviewText) typeParts.push(reviewText)
-  const typeAndReview = typeParts.filter(Boolean).join(' · ') || '병원'
 
   return (
     <>
@@ -83,18 +82,18 @@ export function HospitalBottomSheet({
         aria-hidden
       />
       <div
-        className="fixed left-0 right-0 bottom-0 z-50 rounded-t-2xl bg-gray-900 text-white shadow-2xl safe-area-pb max-h-[85vh] flex flex-col sheet-slide-up"
+        className="fixed left-0 right-0 bottom-0 z-50 flex max-h-[min(85dvh,85vh)] flex-col overflow-hidden rounded-t-2xl bg-gray-900 text-white shadow-2xl safe-area-pb sheet-slide-up"
         role="dialog"
         aria-modal="true"
         aria-labelledby="hospital-sheet-title"
       >
         {/* 드래그 핸들 */}
-        <div className="flex justify-center pt-3 pb-1">
+        <div className="flex shrink-0 justify-center pt-3 pb-1">
           <div className="w-10 h-1 rounded-full bg-gray-600" aria-hidden />
         </div>
 
         {/* 헤더: 이름 + 즐겨찾기 + 닫기 */}
-        <div className="flex items-start gap-3 px-4 pb-3">
+        <div className="flex shrink-0 items-start gap-3 px-4 pb-2">
           <h2
             id="hospital-sheet-title"
             className="flex-1 min-w-0 text-lg font-bold leading-snug break-words"
@@ -123,35 +122,47 @@ export function HospitalBottomSheet({
           </div>
         </div>
 
-        {/* 부제: 심평원 별점 + 타입 · 리뷰 / 거리 · 지역 */}
-        <div className="px-4 pb-3 text-sm text-gray-300 space-y-1">
-          {evaluationScore != null && (
-            <div className="flex items-center gap-2">
-              <EvaluationStars
-                score={evaluationScore}
-                size="lg"
-                tone="hira"
-                invertHiraGrade
-                className="text-sky-400"
-              />
-              <span className="text-gray-400 text-xs">심평원 평가</span>
+        {/* 부제: 사용자·심평원 별점 */}
+        <div className="shrink-0 px-4 pb-2 text-sm text-gray-300">
+          {(h.averageRating != null && (h.reviewCount ?? 0) > 0) ||
+          evaluationScore != null ? (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              {h.averageRating != null && (h.reviewCount ?? 0) > 0 && (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="text-amber-400/90 text-xs font-semibold">
+                    사용자
+                  </span>
+                  <EvaluationStars
+                    score={Math.round(h.averageRating)}
+                    size="lg"
+                    tone="review"
+                    className="text-amber-400"
+                  />
+                  <span className="text-amber-300/80 text-xs tabular-nums">
+                    {h.averageRating.toFixed(1)}
+                  </span>
+                </span>
+              )}
+              {evaluationScore != null && (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="text-sky-400/90 text-xs font-semibold">
+                    심평원
+                  </span>
+                  <EvaluationStars
+                    score={evaluationScore}
+                    size="lg"
+                    tone="hira"
+                    invertHiraGrade
+                    className="text-sky-400"
+                  />
+                </span>
+              )}
             </div>
-          )}
-          <div>
-            <span>{typeAndReview}</span>
-            <span className="mx-2">·</span>
-            <span>{formatDistance(item.distanceMeters)}</span>
-            {h.address && (
-              <>
-                <span className="mx-2">·</span>
-                <span className="truncate block mt-0.5">{h.address}</span>
-              </>
-            )}
-          </div>
+          ) : null}
         </div>
 
         {/* 액션 버튼: 길찾기(지도 앱) + 리뷰 보기 */}
-        <div className="px-4 pb-3 space-y-2">
+        <div className="shrink-0 px-4 pb-3 space-y-2">
           {hasDirections && (
             <div className="flex gap-2">
               <a
@@ -181,8 +192,8 @@ export function HospitalBottomSheet({
           </button>
         </div>
 
-        {/* 상세 정보 (흰 배경) */}
-        <div className="flex-1 overflow-y-auto rounded-t-2xl bg-white text-gray-700 px-4 py-4">
+        {/* 상세 정보 (흰 배경) — min-h-0 없으면 모바일에서 스크롤 불가 */}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-t-2xl bg-white text-gray-700 px-4 py-4 [-webkit-overflow-scrolling:touch]">
           {h.phone && (
             <div className="flex items-center gap-2 py-2 border-b border-gray-100">
               <span className="text-gray-400" aria-hidden>📞</span>
