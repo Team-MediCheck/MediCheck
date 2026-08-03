@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet } from 'react-native'
+import { useState } from 'react'
+import { View, Text, StyleSheet, Pressable } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import type { HospitalEvaluationSummary } from '@/types'
 import {
@@ -13,7 +14,6 @@ type Props = {
 }
 
 function HiraStarRow({ gradeAverage }: { gradeAverage: number }) {
-  const rounded = Math.min(5, Math.max(1, Math.round(gradeAverage)))
   const filled = getHiraGradeAverageAsStarFill(gradeAverage)
   return (
     <View style={styles.starRow}>
@@ -34,6 +34,9 @@ function HiraStarRow({ gradeAverage }: { gradeAverage: number }) {
  * 심평원 병원평가정보(getHospAsmInfo1) 요약·항목별 등급
  */
 export function HiraEvaluationSection({ evaluation }: Props) {
+  const [rowsOpen, setRowsOpen] = useState(false)
+  const [basisOpen, setBasisOpen] = useState(false)
+
   if (!evaluation) {
     return (
       <View style={styles.section}>
@@ -69,21 +72,49 @@ export function HiraEvaluationSection({ evaluation }: Props) {
       ) : null}
 
       {rows.length > 0 ? (
-        <View style={styles.table}>
-          {rows.map((row) => (
-            <View key={row.key} style={styles.tableRow}>
-              <Text style={styles.tableLabel} numberOfLines={2}>
-                {row.label}
-              </Text>
-              <Text style={styles.tableValue}>{row.value}</Text>
-            </View>
-          ))}
+        <View style={styles.tableWrap}>
+          <Pressable
+            onPress={() => setRowsOpen((v) => !v)}
+            style={styles.toggleBtn}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: rowsOpen }}
+          >
+            <Text style={styles.toggleText}>평가 항목 {rows.length}개</Text>
+            <Ionicons
+              name={rowsOpen ? 'chevron-up' : 'chevron-down'}
+              size={18}
+              color="#0369A1"
+            />
+          </Pressable>
+          {rowsOpen
+            ? rows.map((row) => (
+                <View key={row.key} style={styles.tableRow}>
+                  <Text style={styles.tableLabel} numberOfLines={2}>
+                    {row.label}
+                  </Text>
+                  <Text style={styles.tableValue}>{row.value}</Text>
+                </View>
+              ))
+            : null}
         </View>
       ) : (
         <Text style={styles.muted}>표시할 세부 등급 항목이 없습니다.</Text>
       )}
 
-      <Text style={styles.footnote}>{HIRA_ATTR_BASIS}</Text>
+      <Pressable
+        onPress={() => setBasisOpen((v) => !v)}
+        style={styles.basisToggle}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: basisOpen }}
+      >
+        <Text style={styles.basisToggleText}>데이터 출처·평가 근거</Text>
+        <Ionicons
+          name={basisOpen ? 'chevron-up' : 'chevron-down'}
+          size={16}
+          color="#94A3B8"
+        />
+      </Pressable>
+      {basisOpen ? <Text style={styles.footnote}>{HIRA_ATTR_BASIS}</Text> : null}
     </View>
   )
 }
@@ -135,9 +166,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#0C4A6E',
   },
-  table: {
+  tableWrap: {
     borderTopWidth: 1,
     borderColor: '#E2E8F0',
+  },
+  toggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+  },
+  toggleText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0369A1',
   },
   tableRow: {
     flexDirection: 'row',
@@ -172,8 +215,19 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     lineHeight: 18,
   },
-  footnote: {
+  basisToggle: {
     marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  basisToggleText: {
+    fontSize: 12,
+    color: '#64748B',
+  },
+  footnote: {
+    marginTop: 6,
     fontSize: 11,
     color: '#94A3B8',
     lineHeight: 16,

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import type { NearbyHospital } from '../types/hospital'
 import { formatDistance, formatDate } from '../utils/format'
 import { EvaluationStars, getEvaluationStarScore } from './EvaluationStars'
@@ -43,6 +44,14 @@ export function HospitalBottomSheet({
   onToggleFavorite,
 }: HospitalBottomSheetProps) {
   const h = item.hospital
+  const [evalOpen, setEvalOpen] = useState(false)
+  const [basisOpen, setBasisOpen] = useState(false)
+
+  useEffect(() => {
+    setEvalOpen(false)
+    setBasisOpen(false)
+  }, [h.id])
+
   const lat = h.latitude ?? 0
   const lng = h.longitude ?? 0
   const hasDirections = lat !== 0 && lng !== 0
@@ -218,19 +227,34 @@ export function HospitalBottomSheet({
               </div>
               <p className="text-[11px] text-gray-400">{HIRA_ATTR_SHORT} · 병원평가정보</p>
               {evaluationRows.length > 0 ? (
-                <ul className="rounded-xl border border-sky-100 bg-sky-50/60 divide-y divide-sky-100 overflow-hidden">
-                  {evaluationRows.map((row) => (
-                    <li
-                      key={row.key}
-                      className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
-                    >
-                      <span className="text-slate-700 min-w-0">{row.label}</span>
-                      <span className="shrink-0 font-semibold text-sky-800 tabular-nums">
-                        {/^\d+$/.test(row.value) ? `${row.value}등급` : row.value}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setEvalOpen((v) => !v)}
+                    className="w-full min-h-[40px] flex items-center justify-between gap-2 px-3 rounded-xl border border-sky-100 bg-sky-50 text-sm font-medium text-sky-800"
+                    aria-expanded={evalOpen}
+                  >
+                    <span>평가 항목 {evaluationRows.length}개</span>
+                    <span className="text-sky-600" aria-hidden>
+                      {evalOpen ? '▲' : '▼'}
+                    </span>
+                  </button>
+                  {evalOpen && (
+                    <ul className="rounded-xl border border-sky-100 bg-sky-50/60 divide-y divide-sky-100 overflow-hidden">
+                      {evaluationRows.map((row) => (
+                        <li
+                          key={row.key}
+                          className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+                        >
+                          <span className="text-slate-700 min-w-0">{row.label}</span>
+                          <span className="shrink-0 font-semibold text-sky-800 tabular-nums">
+                            {/^\d+$/.test(row.value) ? `${row.value}등급` : row.value}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
               ) : (
                 <p className="text-xs text-emerald-700">
                   심평원 병원평가정보가 있는 병원입니다.
@@ -261,9 +285,22 @@ export function HospitalBottomSheet({
               </div>
             )}
             {(hasEvaluation || hasTop5) && (
-              <p className="text-[11px] text-gray-400 leading-relaxed pt-2 border-t border-gray-100 mt-2">
-                {HIRA_ATTR_BASIS}
-              </p>
+              <div className="pt-2 border-t border-gray-100 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setBasisOpen((v) => !v)}
+                  className="w-full flex items-center justify-between gap-2 text-left text-[11px] text-gray-500 py-1"
+                  aria-expanded={basisOpen}
+                >
+                  <span>데이터 출처·평가 근거</span>
+                  <span aria-hidden>{basisOpen ? '▲' : '▼'}</span>
+                </button>
+                {basisOpen && (
+                  <p className="text-[11px] text-gray-400 leading-relaxed pt-1">
+                    {HIRA_ATTR_BASIS}
+                  </p>
+                )}
+              </div>
             )}
             <p className="text-xs text-gray-400">
               ※ 진료 시간은 병원에 문의해 주세요
