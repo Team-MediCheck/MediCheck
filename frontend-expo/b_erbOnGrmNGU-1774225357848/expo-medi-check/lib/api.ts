@@ -271,9 +271,12 @@ export async function loginWithKakaoNativeAccessToken(
 
 /** 로그인 후 사용자 정보 조회. Bearer 토큰 필요 */
 export async function getMe(token: string): Promise<AuthUser | null> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
   try {
     const res = await fetch(`${BASE_URL}/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
     })
     if (res.status === 401 || !res.ok) return null
     const data = await res.json()
@@ -285,6 +288,8 @@ export async function getMe(token: string): Promise<AuthUser | null> {
     }
   } catch {
     return null
+  } finally {
+    clearTimeout(timeoutId)
   }
 }
 

@@ -342,15 +342,29 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false)
 
   const loginMutation = useMutation({
-    mutationFn: () => login({ loginId, password }),
-    onSuccess: async (data) => {
-      const user = await getMe(data.token)
-      if (!user) {
-        Alert.alert('오류', '사용자 정보를 불러올 수 없습니다.')
-        return
+    mutationFn: async () => {
+      const response = await login({
+        loginId: loginId.trim(),
+        password,
+      })
+      if (!response?.token) {
+        throw new Error('로그인 토큰을 받지 못했습니다.')
       }
-      await setAuth(user, data.token)
-      router.back()
+      const user = await getMe(response.token)
+      if (!user) {
+        throw new Error(
+          '로그인 후 사용자 정보를 불러오지 못했습니다. 네트워크를 확인해 주세요.'
+        )
+      }
+      return { token: response.token, user }
+    },
+    onSuccess: async ({ token, user }) => {
+      await setAuth(user, token)
+      if (router.canGoBack()) {
+        router.back()
+      } else {
+        router.replace('/(tabs)/profile')
+      }
     },
     onError: (err: Error) => {
       Alert.alert(
@@ -619,7 +633,11 @@ export default function LoginScreen() {
         return
       }
       await setAuth(user, data.token)
-      router.back()
+      if (router.canGoBack()) {
+        router.back()
+      } else {
+        router.replace('/(tabs)/profile')
+      }
     },
     onError: (err: Error) => {
       Alert.alert('카카오 로그인 실패', err.message || '다시 시도해 주세요.')
