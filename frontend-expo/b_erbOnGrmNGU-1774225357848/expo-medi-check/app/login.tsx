@@ -255,29 +255,28 @@ function isLikelyKakaoCallbackUrl(url: string, redirectUri: string): boolean {
 }
 
 /**
- * 카카오 로그인 redirect_uri — 카카오 콘솔은 http(s)만 허용(exp:// 불가).
+ * 카카오 로그인 redirect_uri — 카카오 콘솔은 http(s)만 허용(exp://·커스텀 스킴 불가 → KOE006).
+ * iOS Standalone만 ASWebAuthenticationSession용 medicheck:// 을 쓰고,
+ * Android는 항상 HTTPS 콜백(웹과 동일)을 사용한다.
  */
 function getKakaoOAuthRedirectUri(): string {
   if (Platform.OS === 'web') {
     return AuthSession.makeRedirectUri({ path: 'oauth/kakao/callback' })
   }
-  /**
-   * Expo Go(StoreClient)는 exp:// redirect 만 나와 카카오에 등록하기 어렵다 → https 콜백 유지.
-   * Standalone / Dev Client(Bare)는 앱 스킴으로 돌려 iOS ASWebAuthenticationSession 이 https SPA 로드 후에도
-   * 콜백을 앱에 넘기며 시트가 닫히도록 한다.
-   */
-  const exec = Constants.executionEnvironment
-  const shouldUseNativeRedirectForStandalone =
-    (exec === ExecutionEnvironment.Standalone || exec === ExecutionEnvironment.Bare) &&
-    (Platform.OS !== 'android' || USE_ANDROID_KAKAO_NATIVE_SDK)
 
-  if (shouldUseNativeRedirectForStandalone) {
+  const exec = Constants.executionEnvironment
+  const isStandaloneOrBare =
+    exec === ExecutionEnvironment.Standalone || exec === ExecutionEnvironment.Bare
+
+  // iOS 스토어/Dev Client: 커스텀 스킴으로 세션 종료. 카카오 콘솔·백엔드 allowlist에도 동일 URI 필요.
+  if (Platform.OS === 'ios' && isStandaloneOrBare) {
     return AuthSession.makeRedirectUri({
       native: KAKAO_OAUTH_NATIVE_APP_REDIRECT_URI,
       scheme: 'medicheck',
       path: 'oauth/kakao/callback',
     })
   }
+
   const envRedirect = getKakaoOAuthRedirectFromEnvOverride()
   if (envRedirect) {
     return envRedirect
