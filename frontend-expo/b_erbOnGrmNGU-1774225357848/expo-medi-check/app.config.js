@@ -11,7 +11,10 @@ try {
   require('dotenv').config({ quiet: true })
 } catch (_) {}
 
-const nativeKakaoAppKey = process.env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY || ''
+/** 네이티브 앱 키(카카오 콘솔 Android). env 비어 있으면 EAS/로컬 빌드용 기본값 */
+const nativeKakaoAppKey =
+  process.env.EXPO_PUBLIC_KAKAO_NATIVE_APP_KEY ||
+  'ccfc6bfb577d47dc5ab4a502b03ed075'
 const basePlugins = [
   'expo-router',
   [

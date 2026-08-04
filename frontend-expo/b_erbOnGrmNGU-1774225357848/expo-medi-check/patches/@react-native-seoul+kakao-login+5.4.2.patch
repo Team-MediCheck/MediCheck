@@ -1,0 +1,152 @@
+diff --git a/node_modules/@react-native-seoul/kakao-login/android/src/main/java/com/dooboolab/kakaologins/RNKakaoLoginsModule.kt b/node_modules/@react-native-seoul/kakao-login/android/src/main/java/com/dooboolab/kakaologins/RNKakaoLoginsModule.kt
+index ad0ffcd..34487ff 100644
+--- a/node_modules/@react-native-seoul/kakao-login/android/src/main/java/com/dooboolab/kakaologins/RNKakaoLoginsModule.kt
++++ b/node_modules/@react-native-seoul/kakao-login/android/src/main/java/com/dooboolab/kakaologins/RNKakaoLoginsModule.kt
+@@ -22,74 +22,52 @@ class RNKakaoLoginsModule(private val reactContext: ReactApplicationContext) : R
+ 
+     @ReactMethod
+     private fun login(promise: Promise) {
++        val activity = reactContext.currentActivity
++        if (activity == null) {
++            promise.reject("RNKakaoLogins", "Activity is null")
++            return
++        }
++
++        // 공식 문서 조합 예제:
++        // 카카오톡 가능 → loginWithKakaoTalk, 실패(취소 제외) 또는 미설치 → loginWithKakaoAccount
+         if (UserApiClient.instance.isKakaoTalkLoginAvailable(reactContext)) {
+-            reactContext.currentActivity?.let {
+-                UserApiClient.instance.loginWithKakaoTalk(it) { token, error: Throwable? ->
+-                    if (error != null) {
+-                        if (error is AuthError && error.statusCode == 302) {
+-                            this.loginWithKakaoAccount(promise)
+-                            return@loginWithKakaoTalk
+-                        }
+-                        promise.reject("RNKakaoLogins", error.message, error)
++            UserApiClient.instance.loginWithKakaoTalk(activity) { token, error: Throwable? ->
++                if (error != null) {
++                    if (error is AuthError && error.statusCode == 302) {
++                        this.loginWithKakaoAccount(promise)
+                         return@loginWithKakaoTalk
+                     }
+-
+-                    if (token != null) {
+-                        val (accessToken, accessTokenExpiresAt, refreshToken, refreshTokenExpiresAt, idToken, scopes) = token
+-                        val map = Arguments.createMap()
+-                        map.putString("accessToken", accessToken)
+-                        map.putString("refreshToken", refreshToken)
+-                        map.putString("idToken", idToken)
+-                        map.putString("accessTokenExpiresAt", dateFormat(accessTokenExpiresAt))
+-                        map.putString("refreshTokenExpiresAt", dateFormat(refreshTokenExpiresAt))
+-                        val scopeArray = Arguments.createArray()
+-                        if (scopes != null) {
+-                            for (scope in scopes) {
+-                                scopeArray.pushString(scope)
+-                            }
+-                        }
+-                        map.putArray("scopes", scopeArray)
+-                        promise.resolve(map)
++                    // 사용자 취소면 계정 로그인으로 넘기지 않음 (공식 예제)
++                    if (error is com.kakao.sdk.common.model.ClientError &&
++                        error.reason == com.kakao.sdk.common.model.ClientErrorCause.Cancelled
++                    ) {
++                        promise.reject("RNKakaoLogins", error.message, error)
+                         return@loginWithKakaoTalk
+                     }
+-
+-                    promise.reject("RNKakaoLogins", "Token is null")
+-                }
+-            }
+-        } else {
+-            UserApiClient.instance.loginWithKakaoAccount(reactContext) { token, error: Throwable? ->
+-                if (error != null) {
+-                    promise.reject("RNKakaoLogins", error.message, error)
+-                    return@loginWithKakaoAccount
++                    this.loginWithKakaoAccount(promise)
++                    return@loginWithKakaoTalk
+                 }
+ 
+                 if (token != null) {
+-                    val (accessToken, accessTokenExpiresAt, refreshToken, refreshTokenExpiresAt, idToken, scopes) = token
+-                    val map = Arguments.createMap()
+-                    map.putString("accessToken", accessToken)
+-                    map.putString("refreshToken", refreshToken)
+-                    map.putString("idToken", idToken)
+-                    map.putString("accessTokenExpiresAt", dateFormat(accessTokenExpiresAt))
+-                    map.putString("refreshTokenExpiresAt", dateFormat(refreshTokenExpiresAt))
+-                    val scopeArray = Arguments.createArray()
+-                    if (scopes != null) {
+-                        for (scope in scopes) {
+-                            scopeArray.pushString(scope)
+-                        }
+-                    }
+-                    map.putArray("scopes", scopeArray)
+-                    promise.resolve(map)
+-                    return@loginWithKakaoAccount
++                    promise.resolve(tokenToMap(token))
++                    return@loginWithKakaoTalk
+                 }
+ 
+                 promise.reject("RNKakaoLogins", "Token is null")
+             }
++        } else {
++            this.loginWithKakaoAccount(promise)
+         }
+     }
+ 
+     @ReactMethod
+     private fun loginWithKakaoAccount(promise: Promise) {
+-        UserApiClient.instance.loginWithKakaoAccount(reactContext) { token, error: Throwable? ->
++        val activity = reactContext.currentActivity
++        if (activity == null) {
++            promise.reject("RNKakaoLogins", "Activity is null")
++            return
++        }
++        UserApiClient.instance.loginWithKakaoAccount(activity) { token, error: Throwable? ->
+             if (error != null) {
+                 promise.reject("RNKakaoLogins", error.message, error)
+                 return@loginWithKakaoAccount
+@@ -100,25 +78,26 @@ class RNKakaoLoginsModule(private val reactContext: ReactApplicationContext) : R
+                 return@loginWithKakaoAccount
+             }
+ 
+-            if (token != null) {
+-                val (accessToken, accessTokenExpiresAt, refreshToken, refreshTokenExpiresAt, idToken, scopes) = token
+-                val map = Arguments.createMap()
+-                map.putString("accessToken", accessToken)
+-                map.putString("refreshToken", refreshToken)
+-                map.putString("idToken", idToken)
+-                map.putString("accessTokenExpiresAt", dateFormat(accessTokenExpiresAt))
+-                map.putString("refreshTokenExpiresAt", dateFormat(refreshTokenExpiresAt))
+-                val scopeArray = Arguments.createArray()
+-                if (scopes != null) {
+-                    for (scope in scopes) {
+-                        scopeArray.pushString(scope)
+-                    }
+-                }
+-                map.putArray("scopes", scopeArray)
+-                promise.resolve(map)
+-                return@loginWithKakaoAccount
++            promise.resolve(tokenToMap(token))
++        }
++    }
++
++    private fun tokenToMap(token: com.kakao.sdk.auth.model.OAuthToken): WritableMap {
++        val (accessToken, accessTokenExpiresAt, refreshToken, refreshTokenExpiresAt, idToken, scopes) = token
++        val map = Arguments.createMap()
++        map.putString("accessToken", accessToken)
++        map.putString("refreshToken", refreshToken)
++        map.putString("idToken", idToken)
++        map.putString("accessTokenExpiresAt", dateFormat(accessTokenExpiresAt))
++        map.putString("refreshTokenExpiresAt", dateFormat(refreshTokenExpiresAt))
++        val scopeArray = Arguments.createArray()
++        if (scopes != null) {
++            for (scope in scopes) {
++                scopeArray.pushString(scope)
+             }
+         }
++        map.putArray("scopes", scopeArray)
++        return map
+     }
+ 
+     @ReactMethod
