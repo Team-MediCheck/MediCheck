@@ -36,7 +36,11 @@ export default function SignupScreen() {
       }
       await setAuth(user, data.token)
       Alert.alert('회원가입 완료', '환영합니다!')
-      router.back()
+      if (router.canGoBack()) {
+        router.back()
+      } else {
+        router.replace('/(tabs)/profile')
+      }
     },
     onError: (err: Error) => {
       Alert.alert(
