@@ -397,12 +397,10 @@ export default function LoginScreen() {
       }
 
       /**
-       * HTTPS redirect_uri 일 때 nginx 가 `state` 접두어에 따라 `expo-kakao-oauth.html` 로 rewrite 해
-       * `medicheck://`(또는 Expo Go 의 `exp://`)로 code 를 넘긴다. StoreClient 전용으로 두면 Standalone 은
-       * SPA 콜백만 뜨고 `openAuthSessionAsync` 가 URL 을 앱에 넘기지 못한 채 멈추는 경우가 많다(Android).
+       * HTTPS redirect_uri: Android Custom Tabs는 https 콜백 URL을 앱에 넘기지 못해
+       * 로그인 후 SPA에 멈춰 보인다. iOS·Android 모두 브리지 HTML → medicheck:// / exp:// 로 돌려준다.
        */
       const useHttpsBrowserBridge =
-        Platform.OS === 'ios' &&
         redirectUri.startsWith('https://') &&
         !redirectUri.includes('auth.expo.io')
 
@@ -586,33 +584,32 @@ export default function LoginScreen() {
           if (DEBUG_KAKAO_OAUTH) {
             console.log('[KAKAO_OAUTH] native kakao login start')
           }
-          const accessToken = await getNativeAccessTokenOrThrow('talk')
-          return await loginWithNativeToken(accessToken)
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error)
-          const shouldFallbackToKakaoAccount =
-            /user cancelled\.?/i.test(errorMessage) ||
-            /cancel/i.test(errorMessage)
-
-          if (shouldFallbackToKakaoAccount) {
+          // 1) 카카오톡 앱
+          try {
+            const accessToken = await getNativeAccessTokenOrThrow('talk')
+            return await loginWithNativeToken(accessToken)
+          } catch (talkError) {
             if (DEBUG_KAKAO_OAUTH) {
-              console.log('[KAKAO_OAUTH] talk login cancelled; fallback to kakao account login', {
-                errorMessage,
+              console.log('[KAKAO_OAUTH] talk login failed; try kakao account (id/pw)', {
+                talkError,
               })
             }
-            try {
-              const accountAccessToken = await getNativeAccessTokenOrThrow('account')
-              return await loginWithNativeToken(accountAccessToken)
-            } catch (accountError) {
-              if (DEBUG_KAKAO_OAUTH) {
-                console.log('[KAKAO_OAUTH] kakao account fallback failed; try web oauth', {
-                  accountError,
-                })
-              }
+          }
+
+          // 2) 카카오톡 없음/실패 → 계정(아이디·비밀번호) 로그인
+          try {
+            const accountAccessToken = await getNativeAccessTokenOrThrow('account')
+            return await loginWithNativeToken(accountAccessToken)
+          } catch (accountError) {
+            if (DEBUG_KAKAO_OAUTH) {
+              console.log('[KAKAO_OAUTH] kakao account failed; try web oauth bridge', {
+                accountError,
+              })
             }
-          } else if (DEBUG_KAKAO_OAUTH) {
-            console.log('[KAKAO_OAUTH] native kakao login failed; try web oauth', {
-              errorMessage,
+          }
+        } catch (error) {
+          if (DEBUG_KAKAO_OAUTH) {
+            console.log('[KAKAO_OAUTH] native path unexpected error; try web oauth', {
               error,
             })
           }
