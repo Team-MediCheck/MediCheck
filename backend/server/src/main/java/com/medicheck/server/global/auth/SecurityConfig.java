@@ -95,6 +95,7 @@ public class SecurityConfig {
                                 "/api/auth/signup",
                                 "/api/auth/kakao/authorize",
                                 "/api/auth/login/kakao",
+                                "/api/auth/login/kakao/native",
                                 "/api/directions/**",
                                 "/actuator/health",
                                 "/swagger-ui/**",

@@ -24,6 +24,7 @@ import {
   loginWithKakaoAccount as kakaoNativeLoginWithKakaoAccount,
 } from '@react-native-seoul/kakao-login'
 import { login, getMe, loginWithKakao, loginWithKakaoNativeAccessToken } from '@/lib/api'
+import type { AuthResponse } from '@/types'
 
 type Extra = {
   kakaoRestApiKey?: string
@@ -35,10 +36,11 @@ function getKakaoRestApiKey(): string {
 }
 
 const KAKAO_OAUTH_CALLBACK_PATH = '/oauth/kakao/callback'
-const ANDROID_OAUTH_CANCEL_DELAY_MS = 1500
 const IOS_OAUTH_CANCEL_DELAY_MS = 300
-const DEBUG_KAKAO_OAUTH = true
+const DEBUG_KAKAO_OAUTH = typeof __DEV__ !== 'undefined' && __DEV__
 const USE_ANDROID_KAKAO_NATIVE_SDK = true
+/** 카카오톡 앱 전환·계정 입력에 여유를 둠 */
+const NATIVE_KAKAO_LOGIN_TIMEOUT_MS = 60_000
 
 /**
  * Standalone / Dev Client 전용. 호스트 `app`으로 두어 `new URL(...)` 파싱 시 pathname 이 `/oauth/kakao/callback` 이 되게 함.
@@ -361,100 +363,7 @@ export default function LoginScreen() {
 
   const kakaoMutation = useMutation({
     mutationFn: async () => {
-      if (Platform.OS === 'android' && USE_ANDROID_KAKAO_NATIVE_SDK) {
-        const loginWithNativeToken = async (accessToken: string) => {
-          if (DEBUG_KAKAO_OAUTH) {
-            console.log('[KAKAO_OAUTH] before backend loginWithKakaoNativeAccessToken')
-          }
-          const response = await loginWithKakaoNativeAccessToken(accessToken)
-          if (DEBUG_KAKAO_OAUTH) {
-            console.log('[KAKAO_OAUTH] after backend loginWithKakaoNativeAccessToken', {
-              hasToken: Boolean(response?.token),
-            })
-          }
-          return response
-        }
-
-        const getNativeAccessTokenOrThrow = async (
-          strategy: 'talk' | 'account'
-        ): Promise<string> => {
-          const strategyLabel = strategy === 'talk' ? 'kakaoTalk' : 'kakaoAccount'
-          const loginFn =
-            strategy === 'talk' ? kakaoNativeLogin : kakaoNativeLoginWithKakaoAccount
-          const token = await Promise.race([
-            loginFn(),
-            new Promise<never>((_, reject) =>
-              setTimeout(
-                () =>
-                  reject(
-                    new Error(`카카오 네이티브 로그인 응답 타임아웃(5s) - ${strategyLabel}`)
-                  ),
-                5000
-              )
-            ),
-          ])
-          const accessToken = token?.accessToken?.trim()
-          if (DEBUG_KAKAO_OAUTH) {
-            console.log('[KAKAO_OAUTH] native kakao login response', {
-              strategy: strategyLabel,
-              hasAccessToken: Boolean(accessToken),
-              accessTokenLength: accessToken?.length ?? 0,
-            })
-          }
-          if (!accessToken) {
-            throw new Error(`카카오 네이티브 로그인 토큰이 비어 있습니다. (${strategyLabel})`)
-          }
-          return accessToken
-        }
-
-        try {
-          if (DEBUG_KAKAO_OAUTH) {
-            console.log('[KAKAO_OAUTH] native kakao login start')
-          }
-          const accessToken = await getNativeAccessTokenOrThrow('talk')
-          return await loginWithNativeToken(accessToken)
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error)
-          const shouldFallbackToKakaoAccount =
-            /user cancelled\.?/i.test(errorMessage) ||
-            /cancel/i.test(errorMessage)
-
-          if (shouldFallbackToKakaoAccount) {
-            if (DEBUG_KAKAO_OAUTH) {
-              console.log('[KAKAO_OAUTH] talk login cancelled; fallback to kakao account login', {
-                errorMessage,
-              })
-            }
-            try {
-              const accountAccessToken = await getNativeAccessTokenOrThrow('account')
-              return await loginWithNativeToken(accountAccessToken)
-            } catch (accountError) {
-              const accountErrorMessage =
-                accountError instanceof Error ? accountError.message : String(accountError)
-              if (DEBUG_KAKAO_OAUTH) {
-                console.log('[KAKAO_OAUTH] kakao account fallback failed', {
-                  accountErrorMessage,
-                  accountError,
-                })
-                Alert.alert('Kakao Native Debug Error', accountErrorMessage)
-              }
-              throw accountError instanceof Error
-                ? accountError
-                : new Error(accountErrorMessage)
-            }
-          }
-
-          if (DEBUG_KAKAO_OAUTH) {
-            console.log('[KAKAO_OAUTH] native kakao login failed', {
-              errorMessage,
-              error,
-            })
-            Alert.alert('Kakao Native Debug Error', errorMessage)
-          }
-          throw error instanceof Error ? error : new Error(errorMessage)
-        }
-      }
-
+      const runWebOAuthLogin = async (): Promise<AuthResponse> => {
       const kakaoRestApiKey = getKakaoRestApiKey()
       if (!kakaoRestApiKey) {
         throw new Error(
@@ -610,6 +519,99 @@ export default function LoginScreen() {
         })
       }
       return loginWithKakao(code, effectiveRedirectUri)
+      }
+
+      if (Platform.OS === 'android' && USE_ANDROID_KAKAO_NATIVE_SDK) {
+        const loginWithNativeToken = async (accessToken: string) => {
+          if (DEBUG_KAKAO_OAUTH) {
+            console.log('[KAKAO_OAUTH] before backend loginWithKakaoNativeAccessToken')
+          }
+          const response = await loginWithKakaoNativeAccessToken(accessToken)
+          if (DEBUG_KAKAO_OAUTH) {
+            console.log('[KAKAO_OAUTH] after backend loginWithKakaoNativeAccessToken', {
+              hasToken: Boolean(response?.token),
+            })
+          }
+          return response
+        }
+
+        const getNativeAccessTokenOrThrow = async (
+          strategy: 'talk' | 'account'
+        ): Promise<string> => {
+          const strategyLabel = strategy === 'talk' ? 'kakaoTalk' : 'kakaoAccount'
+          const loginFn =
+            strategy === 'talk' ? kakaoNativeLogin : kakaoNativeLoginWithKakaoAccount
+          const token = await Promise.race([
+            loginFn(),
+            new Promise<never>((_, reject) =>
+              setTimeout(
+                () =>
+                  reject(
+                    new Error(
+                      `카카오 네이티브 로그인 응답 타임아웃(${NATIVE_KAKAO_LOGIN_TIMEOUT_MS / 1000}s) - ${strategyLabel}`
+                    )
+                  ),
+                NATIVE_KAKAO_LOGIN_TIMEOUT_MS
+              )
+            ),
+          ])
+          const accessToken = token?.accessToken?.trim()
+          if (DEBUG_KAKAO_OAUTH) {
+            console.log('[KAKAO_OAUTH] native kakao login response', {
+              strategy: strategyLabel,
+              hasAccessToken: Boolean(accessToken),
+              accessTokenLength: accessToken?.length ?? 0,
+            })
+          }
+          if (!accessToken) {
+            throw new Error(`카카오 네이티브 로그인 토큰이 비어 있습니다. (${strategyLabel})`)
+          }
+          return accessToken
+        }
+
+        try {
+          if (DEBUG_KAKAO_OAUTH) {
+            console.log('[KAKAO_OAUTH] native kakao login start')
+          }
+          const accessToken = await getNativeAccessTokenOrThrow('talk')
+          return await loginWithNativeToken(accessToken)
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error)
+          const shouldFallbackToKakaoAccount =
+            /user cancelled\.?/i.test(errorMessage) ||
+            /cancel/i.test(errorMessage)
+
+          if (shouldFallbackToKakaoAccount) {
+            if (DEBUG_KAKAO_OAUTH) {
+              console.log('[KAKAO_OAUTH] talk login cancelled; fallback to kakao account login', {
+                errorMessage,
+              })
+            }
+            try {
+              const accountAccessToken = await getNativeAccessTokenOrThrow('account')
+              return await loginWithNativeToken(accountAccessToken)
+            } catch (accountError) {
+              if (DEBUG_KAKAO_OAUTH) {
+                console.log('[KAKAO_OAUTH] kakao account fallback failed; try web oauth', {
+                  accountError,
+                })
+              }
+            }
+          } else if (DEBUG_KAKAO_OAUTH) {
+            console.log('[KAKAO_OAUTH] native kakao login failed; try web oauth', {
+              errorMessage,
+              error,
+            })
+          }
+        }
+
+        if (DEBUG_KAKAO_OAUTH) {
+          console.log('[KAKAO_OAUTH] falling back to web oauth after native failure')
+        }
+        return runWebOAuthLogin()
+      }
+
+      return runWebOAuthLogin()
     },
     onSuccess: async (data) => {
       const user = await getMe(data.token)
