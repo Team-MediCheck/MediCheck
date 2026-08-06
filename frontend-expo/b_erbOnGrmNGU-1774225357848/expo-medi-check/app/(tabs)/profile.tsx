@@ -1,7 +1,15 @@
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native'
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  ScrollView,
+} from 'react-native'
 import { useRouter } from 'expo-router'
 import Constants from 'expo-constants'
 import { Ionicons } from '@expo/vector-icons'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAuthStore } from '@/store/authStore'
 import { deleteAccount } from '@/lib/api'
 
@@ -14,9 +22,11 @@ function profileInitial(name: string, loginId: string): string {
 
 export default function ProfileScreen() {
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const user = useAuthStore((state) => state.user)
   const logout = useAuthStore((state) => state.logout)
   const appVersion = Constants.expoConfig?.version ?? '1.0.0'
+  const scrollBottomPad = Math.max(insets.bottom, 8) + 88
 
   const handleLogout = () => {
     Alert.alert('로그아웃', '정말 로그아웃 하시겠습니까?', [
@@ -68,7 +78,12 @@ export default function ProfileScreen() {
 
   if (!user) {
     return (
-      <View style={styles.container}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollBottomPad }]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.guestHeader}>
           <View style={styles.avatarPlaceholder}>
             <Ionicons name="person-outline" size={40} color="#94A3B8" />
@@ -122,12 +137,17 @@ export default function ProfileScreen() {
         </View>
 
         <Text style={styles.version}>바로닥터 v{appVersion}</Text>
-      </View>
+      </ScrollView>
     )
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollBottomPad }]}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
       <View style={styles.userHeader}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>
@@ -181,14 +201,17 @@ export default function ProfileScreen() {
           <Ionicons name="log-out-outline" size={24} color="#EF4444" />
           <Text style={[styles.menuText, styles.logoutText]}>로그아웃</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.menuItem} onPress={handleDeleteAccount}>
+        <TouchableOpacity
+          style={[styles.menuItem, styles.menuItemLast]}
+          onPress={handleDeleteAccount}
+        >
           <Ionicons name="trash-outline" size={24} color="#EF4444" />
           <Text style={[styles.menuText, styles.logoutText]}>회원 탈퇴</Text>
         </TouchableOpacity>
       </View>
 
       <Text style={styles.version}>바로닥터 v{appVersion}</Text>
-    </View>
+    </ScrollView>
   )
 }
 
@@ -196,6 +219,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   guestHeader: {
     alignItems: 'center',
@@ -300,6 +326,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
     gap: 12,
+  },
+  menuItemLast: {
+    borderBottomWidth: 0,
   },
   menuText: {
     flex: 1,
