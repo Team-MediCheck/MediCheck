@@ -29,8 +29,9 @@ cp "$DEPLOY_PATH/.env.local" "$RELEASE_DIR/.env.local"
 cp "$DEPLOY_PATH/backend/server/.env.prod" "$RELEASE_DIR/backend/server/.env.prod"
 chmod 600 "$RELEASE_DIR/.env.local" "$RELEASE_DIR/backend/server/.env.prod"
 
-# The LaunchAgent cannot use the login keychain. Use a temporary Docker config
-# with the same contexts, without modifying ~/.docker or another project's credentials.
+# Snapshot the existing authentication and helper references without modifying
+# the user's config. The runner must be able to access the configured helpers;
+# do not silently fall back to anonymous pulls if a helper is unavailable.
 ORIGINAL_DOCKER_CONFIG="${DOCKER_CONFIG:-$HOME/.docker}"
 DOCKER_CONTEXT="$(docker context show)"
 export DOCKER_CONTEXT
@@ -41,7 +42,12 @@ cleanup() {
   if [[ "$VERIFY_ONLY" == true ]]; then rm -rf "$RELEASE_DIR"; fi
 }
 trap cleanup EXIT
-printf '%s\n' '{}' > "$DOCKER_CONFIG/config.json"
+if [[ -f "$ORIGINAL_DOCKER_CONFIG/config.json" ]]; then
+  cp "$ORIGINAL_DOCKER_CONFIG/config.json" "$DOCKER_CONFIG/config.json"
+else
+  printf '%s\n' '{}' > "$DOCKER_CONFIG/config.json"
+fi
+chmod 600 "$DOCKER_CONFIG/config.json"
 for entry in contexts cli-plugins; do
   if [[ -d "$ORIGINAL_DOCKER_CONFIG/$entry" ]]; then
     ln -s "$ORIGINAL_DOCKER_CONFIG/$entry" "$DOCKER_CONFIG/$entry"

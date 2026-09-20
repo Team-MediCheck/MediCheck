@@ -173,6 +173,11 @@ SSH 키를 GitHub Secrets에 추가할 필요 없이 맥미니의 러너가 배�
 - 커밋된 소스만 `~/.local/share/medicheck/releases/` 폴더에 풀어 빌드합니다.
   macOS 백그라운드 프로세스의 Desktop 접근 문제를 피하도록 환경 파일도 권한 `600`으로 복사합니다.
   운영 체크아웃의 미커밋 파일과 사용자 Docker 인증 설정을 덮어쓰지 않습니다.
+- 임시 Docker 구성에는 기존 `auths`, `credsStore`, `credHelpers`를 그대로 복사하고
+  파일 권한을 `600`으로 제한합니다. 사용 중인 credential helper는 러너에서도 접근 가능해야 합니다.
+  macOS 로그인 키체인을 사용할 수 없다면 러너에서 접근 가능한 인증 방식으로 구성해야 하며,
+  인증 실패를 익명 접근으로 우회하지 않습니다.
+- 외부 GitHub Actions는 전체 커밋 SHA로 고정하며 Dependabot이 매주 업데이트 PR을 제안합니다.
 - 백엔드·웹 이미지를 모두 빌드한 후 서비스만 교체하고 상태와 API 연결을 확인합니다.
   MySQL·Caddy를 재기동하거나 DB 데이터를 복구하는 작업은 포함하지 않습니다.
 - EC2 배포는 저장소 변수 `EC2_DEPLOY_ENABLED=true`일 때만 실행합니다.

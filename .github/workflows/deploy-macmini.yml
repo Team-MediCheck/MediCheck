@@ -13,7 +13,7 @@ on:
       - "backend/server/**"
       - "frontend/**"
       - "docker-compose.local.yml"
-      - "scripts/deploy/macmini.sh"
+      - "scripts/deploy/**"
       - ".github/workflows/deploy-macmini.yml"
       - ".github/workflows/ci-pr-smoke.yml"
 
@@ -36,7 +36,7 @@ jobs:
       DEPLOY_PATH: ${{ vars.MACMINI_DEPLOY_PATH || '/Users/snowrabbit123/.config/medicheck-deploy' }}
       VERIFY_ONLY: ${{ github.event_name == 'workflow_dispatch' && !inputs.deploy && 'true' || 'false' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
       - name: Deploy checked out commit
