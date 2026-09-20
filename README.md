@@ -165,9 +165,11 @@ SSH 키를 GitHub Secrets에 추가할 필요 없이 맥미니의 러너가 배�
 - `main`의 백엔드·웹·배포 코드 변경 시 백엔드 테스트와 웹 빌드가 통과한 뒤 자동 배포합니다.
 - Actions → Deploy Mac Mini → Run workflow에서 `deploy`를 해제하면 환경 확인만 수행합니다.
   체크하면 선택한 브랜치의 해당 커밋을 실제 배포합니다.
-- 저장소 Actions 변수 `MACMINI_DEPLOY_PATH`로 운영 경로를 지정할 수 있습니다.
-  기본값은 `/Users/snowrabbit123/Desktop/Medicheck/MediCheck`입니다.
-- 기존 운영 경로의 `.env.local`, `backend/server/.env.prod`와 실행 중인 MySQL이 필요합니다.
+- 저장소 Actions 변수 `MACMINI_DEPLOY_PATH`로 환경 파일 경로를 지정할 수 있습니다.
+  기본값은 `/Users/snowrabbit123/.config/medicheck-deploy`입니다.
+- 해당 경로의 `.env.local`, `backend/server/.env.prod`와 실행 중인 MySQL이 필요합니다.
+  최초 설정 시 기존 운영 경로에서 환경 파일 두 개를 복사하고 파일 권한은 `600`,
+  상위 디렉터리는 `700`으로 설정합니다. 값이 바뀌면 이 배포용 사본도 갱신해야 합니다.
 - 커밋된 소스만 `~/.local/share/medicheck/releases/` 폴더에 풀어 빌드합니다.
   macOS 백그라운드 프로세스의 Desktop 접근 문제를 피하도록 환경 파일도 권한 `600`으로 복사합니다.
   운영 체크아웃의 미커밋 파일과 사용자 Docker 인증 설정을 덮어쓰지 않습니다.

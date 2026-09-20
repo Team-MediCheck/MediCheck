@@ -2,7 +2,7 @@
 set -euo pipefail
 umask 077
 
-DEPLOY_PATH="${DEPLOY_PATH:?DEPLOY_PATH must point to the existing Mac Mini deployment}"
+DEPLOY_PATH="${DEPLOY_PATH:?DEPLOY_PATH must point to the private deployment environment directory}"
 VERIFY_ONLY="${VERIFY_ONLY:-true}"
 case "$VERIFY_ONLY" in true|false) ;; *) echo "VERIFY_ONLY must be true or false" >&2; exit 1 ;; esac
 SOURCE_DIR="$(git rev-parse --show-toplevel)"
