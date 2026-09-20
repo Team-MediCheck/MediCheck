@@ -3,7 +3,10 @@ package com.medicheck.server.global.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.web.client.RestTemplate;
+
+import java.nio.charset.StandardCharsets;
 
 /**
  * RestTemplate 빈 설정.
@@ -33,6 +36,13 @@ public class RestTemplateConfig {
      */
     @Bean(name = "hiraRestTemplate")
     public RestTemplate hiraRestTemplate() {
-        return createRestTemplate();
+        RestTemplate restTemplate = createRestTemplate();
+        // HIRA XML은 charset 헤더 없이 UTF-8로 올 수 있다. 기본 ISO-8859-1로
+        // 읽으면 한글이 깨진 상태로 파싱·저장된다. 명시된 응답 charset은 그대로 존중한다.
+        restTemplate.getMessageConverters().stream()
+                .filter(StringHttpMessageConverter.class::isInstance)
+                .map(StringHttpMessageConverter.class::cast)
+                .forEach(converter -> converter.setDefaultCharset(StandardCharsets.UTF_8));
+        return restTemplate;
     }
 }

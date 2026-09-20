@@ -155,6 +155,72 @@ bash scripts/deploy/redeploy.sh
 - 시크릿 관리: `.env` 파일은 커밋 금지, 가능하면 AWS SSM/Secrets Manager 사용
 - CORS 오류 시 `CORS_ALLOWED_ORIGINS` 값 우선 점검
 
+## 맥미니 GitHub Actions 배포
+
+현재 맥미니 운영 저장소는 `Team-MediCheck/MediCheck`이며,
+`medicheck-macmini` self-hosted runner가 `self-hosted`, `macOS`, `ARM64`, `medicheck` 라벨로 연결되어 있습니다.
+SSH 키를 GitHub Secrets에 추가할 필요 없이 맥미니의 러너가 배포를 실행합니다.
+
+- 워크플로: `.github/workflows/deploy-macmini.yml` (`Deploy Mac Mini`)
+- `main`의 백엔드·웹·배포 코드 변경 시 백엔드 테스트와 웹 빌드가 통과한 뒤 자동 배포합니다.
+- Actions → Deploy Mac Mini → Run workflow에서 `deploy`를 해제하면 환경 확인만 수행합니다.
+  체크하면 선택한 브랜치의 해당 커밋을 실제 배포합니다.
+- 저장소 Actions 변수 `MACMINI_DEPLOY_PATH`로 환경 파일 경로를 지정할 수 있습니다.
+  기본값은 `/Users/snowrabbit123/.config/medicheck-deploy`입니다.
+- 해당 경로의 `.env.local`, `backend/server/.env.prod`와 실행 중인 MySQL이 필요합니다.
+  최초 설정 시 기존 운영 경로에서 환경 파일 두 개를 복사하고 파일 권한은 `600`,
+  상위 디렉터리는 `700`으로 설정합니다. 값이 바뀌면 이 배포용 사본도 갱신해야 합니다.
+- 커밋된 소스만 `~/.local/share/medicheck/releases/` 폴더에 풀어 빌드합니다.
+  macOS 백그라운드 프로세스의 Desktop 접근 문제를 피하도록 환경 파일도 권한 `600`으로 복사합니다.
+  운영 체크아웃의 미커밋 파일과 사용자 Docker 인증 설정을 덮어쓰지 않습니다.
+- 임시 Docker 구성에는 기존 `auths`, `credsStore`, `credHelpers`를 그대로 복사하고
+  파일 권한을 `600`으로 제한합니다. 사용 중인 credential helper는 러너에서도 접근 가능해야 합니다.
+  macOS 로그인 키체인을 사용할 수 없다면 러너에서 접근 가능한 인증 방식으로 구성해야 하며,
+  인증 실패를 익명 접근으로 우회하지 않습니다.
+- 외부 GitHub Actions는 전체 커밋 SHA로 고정하며 Dependabot이 매주 업데이트 PR을 제안합니다.
+- 백엔드·웹 이미지를 모두 빌드한 후 서비스만 교체하고 상태와 API 연결을 확인합니다.
+  MySQL·Caddy를 재기동하거나 DB 데이터를 복구하는 작업은 포함하지 않습니다.
+- EC2 배포는 저장소 변수 `EC2_DEPLOY_ENABLED=true`일 때만 실행합니다.
+
+PR 검사도 GitHub 호스팅 러너에서 백엔드 테스트와 웹 빌드를 수행합니다.
+실제 배포는 잠시 요청이 실패할 수 있는 단일 서버 재기동 방식이며 자동 롤백은 없습니다.
+실패 시 Actions 로그와 해당 릴리스 경로를 확인하고 정상 커밋을 수동 배포합니다.
+
+## 증상별 질병명이 `ê…`, `ë…`처럼 깨지는 경우
+
+HIRA Top5 XML 응답에 charset이 없을 때 문자열을 ISO-8859-1로 읽으면,
+UTF-8 한글이 깨진 상태로 `hospital_clinic_top5.disease_nm_1`~`disease_nm_5`에 저장될 수 있습니다.
+HIRA 전용 HTTP 클라이언트는 charset 미지정 응답의 기본값을 UTF-8로 사용합니다.
+
+운영 데이터 확인·복구 순서:
+
+1. `GET /api/hospitals/search/symptom-keywords` 응답과 아래 DB 조회 결과를 비교합니다.
+   DB 값도 깨져 있다면 화면 표시만의 문제가 아닙니다.
+
+   ```sql
+   SELECT hospital_id, disease_nm_1, disease_nm_2, disease_nm_3, disease_nm_4, disease_nm_5
+   FROM hospital_clinic_top5
+   WHERE CONCAT_WS(' ', disease_nm_1, disease_nm_2, disease_nm_3, disease_nm_4, disease_nm_5)
+         REGEXP '[À-ÿ�]'
+   ORDER BY hospital_id
+   LIMIT 100;
+   ```
+
+2. 수정된 백엔드를 배포하고 기존 Top5 데이터를 백업합니다.
+3. 관리자 헤더 `X-Admin-Key`를 사용하여
+   `POST /api/hospitals/sync/top5/one?ykiho=<해당 병원의 요양기호>`로 한 병원을 재동기화한 뒤
+   DB 질병명과 API 응답이 정상인지 확인합니다.
+4. 정상 확인 후 `POST /api/hospitals/sync/top5/region?addressKeyword=<지역>` 등으로
+   영향을 받은 범위를 재동기화합니다. 성공 응답은 기존 병원의 Top5 값을 갱신합니다.
+   현재 동기화 구현은 API 오류·응답 없음에도 해당 병원의 기존 Top5를 삭제하므로,
+   백업과 소량 검증 후 범위를 확대해야 합니다.
+5. 질병명 API를 다시 조회하고 화면을 새로고침합니다.
+
+코드 수정만으로 이미 저장된 문자열이 복구되지는 않습니다.
+문자열이 ISO-8859-1 오해석 패턴으로만 손상됐다면 역변환으로 복원할 수도 있지만,
+전체 대상의 왕복 변환 검증과 백업 후 적용해야 합니다. 위 조회는 의심 항목을 찾기 위한 조건이며
+일치하는 모든 문자열이 손상됐다는 의미는 아닙니다.
+
 ## 참고 문서
 
 - 백엔드 상세: `backend/server/README.md`
