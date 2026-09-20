@@ -27,6 +27,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: vars.EC2_DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
