@@ -70,6 +70,14 @@ fi
 
 # Finish both builds before replacing running services. MySQL and Caddy stay up.
 "${COMPOSE[@]}" build backend frontend </dev/null
+# Check the built image as its normal nginx user before replacing live services.
+"${COMPOSE[@]}" run --rm --no-deps --entrypoint sh frontend -ec '
+  nginx -t
+  nginx
+  trap "nginx -s quit" EXIT
+  wget -q -O /dev/null http://127.0.0.1:8080/
+  wget -q -O /dev/null http://127.0.0.1:8080/api/hospitals/search/symptom-keywords
+' </dev/null
 "${COMPOSE[@]}" up -d --no-deps --wait --wait-timeout 180 backend </dev/null
 "${COMPOSE[@]}" up -d --no-deps --wait --wait-timeout 60 frontend </dev/null
 docker exec medicheck-backend curl -fsS http://127.0.0.1:8080/actuator/health
