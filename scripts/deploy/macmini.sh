@@ -20,12 +20,14 @@ done
 docker info >/dev/null
 
 # Build only committed source. Keep the operator's checkout and local files intact.
-RELEASE_ROOT="${DEPLOY_PATH%/*}/medicheck-releases"
+# Keep background Docker builds outside macOS-protected Desktop/Documents paths.
+RELEASE_ROOT="${RELEASE_ROOT:-$HOME/.local/share/medicheck/releases}"
 mkdir -p "$RELEASE_ROOT"
 RELEASE_DIR="$(mktemp -d "$RELEASE_ROOT/${REVISION:0:12}.XXXXXX")"
 git -C "$SOURCE_DIR" archive "$REVISION" | tar -x -C "$RELEASE_DIR"
-ln -s "$DEPLOY_PATH/.env.local" "$RELEASE_DIR/.env.local"
-ln -s "$DEPLOY_PATH/backend/server/.env.prod" "$RELEASE_DIR/backend/server/.env.prod"
+cp "$DEPLOY_PATH/.env.local" "$RELEASE_DIR/.env.local"
+cp "$DEPLOY_PATH/backend/server/.env.prod" "$RELEASE_DIR/backend/server/.env.prod"
+chmod 600 "$RELEASE_DIR/.env.local" "$RELEASE_DIR/backend/server/.env.prod"
 
 # The LaunchAgent cannot use the login keychain. Use a temporary Docker config
 # with the same contexts, without modifying ~/.docker or another project's credentials.
@@ -50,7 +52,8 @@ COMPOSE=(docker compose --project-name medicheck
   --project-directory "$RELEASE_DIR"
   --env-file "$RELEASE_DIR/.env.local"
   -f "$RELEASE_DIR/docker-compose.local.yml")
-"${COMPOSE[@]}" config --quiet
+echo "Validating Compose configuration for $REVISION"
+"${COMPOSE[@]}" config --quiet </dev/null
 test "$(docker inspect --format '{{.State.Health.Status}}' medicheck-mysql)" = healthy
 
 if [[ "$VERIFY_ONLY" == true ]]; then
@@ -60,9 +63,9 @@ if [[ "$VERIFY_ONLY" == true ]]; then
 fi
 
 # Finish both builds before replacing running services. MySQL and Caddy stay up.
-"${COMPOSE[@]}" build backend frontend
-"${COMPOSE[@]}" up -d --no-deps --wait --wait-timeout 180 backend
-"${COMPOSE[@]}" up -d --no-deps --wait --wait-timeout 60 frontend
+"${COMPOSE[@]}" build backend frontend </dev/null
+"${COMPOSE[@]}" up -d --no-deps --wait --wait-timeout 180 backend </dev/null
+"${COMPOSE[@]}" up -d --no-deps --wait --wait-timeout 60 frontend </dev/null
 docker exec medicheck-backend curl -fsS http://127.0.0.1:8080/actuator/health
 docker exec medicheck-frontend wget -q -O /dev/null http://127.0.0.1:8080/
 docker exec medicheck-frontend wget -q -O /dev/null http://127.0.0.1:8080/api/hospitals/search/symptom-keywords

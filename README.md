@@ -168,7 +168,8 @@ SSH 키를 GitHub Secrets에 추가할 필요 없이 맥미니의 러너가 배�
 - 저장소 Actions 변수 `MACMINI_DEPLOY_PATH`로 운영 경로를 지정할 수 있습니다.
   기본값은 `/Users/snowrabbit123/Desktop/Medicheck/MediCheck`입니다.
 - 기존 운영 경로의 `.env.local`, `backend/server/.env.prod`와 실행 중인 MySQL이 필요합니다.
-- 커밋된 소스만 별도 `medicheck-releases/` 폴더에 풀어 빌드합니다.
+- 커밋된 소스만 `~/.local/share/medicheck/releases/` 폴더에 풀어 빌드합니다.
+  macOS 백그라운드 프로세스의 Desktop 접근 문제를 피하도록 환경 파일도 권한 `600`으로 복사합니다.
   운영 체크아웃의 미커밋 파일과 사용자 Docker 인증 설정을 덮어쓰지 않습니다.
 - 백엔드·웹 이미지를 모두 빌드한 후 서비스만 교체하고 상태와 API 연결을 확인합니다.
   MySQL·Caddy를 재기동하거나 DB 데이터를 복구하는 작업은 포함하지 않습니다.
@@ -176,7 +177,7 @@ SSH 키를 GitHub Secrets에 추가할 필요 없이 맥미니의 러너가 배�
 
 PR 검사도 GitHub 호스팅 러너에서 백엔드 테스트와 웹 빌드를 수행합니다.
 실제 배포는 잠시 요청이 실패할 수 있는 단일 서버 재기동 방식이며 자동 롤백은 없습니다.
-실패 시 Actions 로그와 해당 `medicheck-releases/` 경로를 확인하고 정상 커밋을 수동 배포합니다.
+실패 시 Actions 로그와 해당 릴리스 경로를 확인하고 정상 커밋을 수동 배포합니다.
 
 ## 증상별 질병명이 `ê…`, `ë…`처럼 깨지는 경우
 
