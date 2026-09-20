@@ -10,7 +10,7 @@
   - 카카오맵(JavaScript SDK), 카카오모빌리티 길찾기 API
   - 카카오 OAuth 로그인
   - 건강보험심사평가원(HIRA) Open API
-- **배포 방식**: AWS EC2 + Docker Compose (`docker-compose.aws.yml`)
+- **현재 배포 방식**: 맥미니 + Docker Compose (`docker-compose.local.yml`), GitHub Actions self-hosted runner
 
 ## 주요 기능
 
@@ -28,7 +28,7 @@
 
 - **Frontend**: React 19, TypeScript, Vite, React Router, React Query, Tailwind CSS
 - **Backend**: Java 21, Spring Boot 3, Spring Security, Spring Data JPA, Flyway
-- **Infra**: Docker, Docker Compose, AWS EC2 (with RDS)
+- **Infra**: Docker Desktop, Docker Compose, 맥미니, MySQL
 
 ## 저장소 구조
 
@@ -118,9 +118,10 @@ npm run dev
 - 주요 변수:
   - `VITE_KAKAO_APP_KEY`
 
-## AWS + Docker 배포
+## AWS + Docker 배포 (선택 구성)
 
-상세 문서는 `DEPLOY_AWS_DOCKER.md`를 참고하세요.
+현재 운영은 아래의 맥미니 GitHub Actions 배포를 사용합니다.
+AWS로 별도 배포할 때의 참고 문서는 `DEPLOY_AWS_DOCKER.md`입니다.
 
 핵심 절차(EC2 + 외부 MySQL/RDS 기준):
 
@@ -180,7 +181,7 @@ SSH 키를 GitHub Secrets에 추가할 필요 없이 맥미니의 러너가 배�
 - 외부 GitHub Actions는 전체 커밋 SHA로 고정하며 Dependabot이 매주 업데이트 PR을 제안합니다.
 - 백엔드·웹 이미지를 모두 빌드한 후 서비스만 교체하고 상태와 API 연결을 확인합니다.
   MySQL·Caddy를 재기동하거나 DB 데이터를 복구하는 작업은 포함하지 않습니다.
-- EC2 배포는 저장소 변수 `EC2_DEPLOY_ENABLED=true`일 때만 실행합니다.
+- 자동 배포 워크플로는 맥미니 전용입니다. EC2 배포 워크플로는 제거했습니다.
 
 PR 검사도 GitHub 호스팅 러너에서 백엔드 테스트와 웹 빌드를 수행합니다.
 실제 배포는 잠시 요청이 실패할 수 있는 단일 서버 재기동 방식이며 자동 롤백은 없습니다.
